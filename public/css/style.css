@@ -18,10 +18,10 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.6;
-    background-color: var(--light-gray);
-    color: var(--dark-gray);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
 }
 
 .container {
@@ -48,32 +48,21 @@ body {
 }
 
 .form-group {
-    margin-bottom: 20px;
-    position: relative;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: var(--dark-gray);
+    margin-bottom: 5px;
+    color: #333;
 }
 
 .form-group input,
 .form-group select {
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 14px;
-    transition: all 0.3s ease;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    border-color: var(--primary-color);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
 }
 
 .password-toggle {
@@ -106,9 +95,8 @@ header {
     align-items: center;
     margin-bottom: 30px;
     padding: 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .header-info {
@@ -118,13 +106,13 @@ header {
 }
 
 .header-info h1 {
-    color: var(--primary-color);
-    font-size: 24px;
+    margin: 0;
+    color: #333;
 }
 
 .welcome-text {
-    color: var(--gray-color);
-    font-size: 14px;
+    margin: 5px 0;
+    color: #666;
 }
 
 /* Button Styles */
@@ -197,25 +185,20 @@ button,
 }
 
 .class-card {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-}
-
-.class-card:hover {
-    transform: translateY(-5px);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .class-card h2 {
-    margin-bottom: 15px;
-    color: var(--primary-color);
-    font-size: 20px;
+    margin: 0 0 10px 0;
+    color: #333;
 }
 
-.card-actions {
-    margin-top: 20px;
+.class-card p {
+    margin: 0 0 15px 0;
+    color: #666;
 }
 
 /* Students Table */
@@ -270,11 +253,12 @@ tr:hover {
 
 .modal-content {
     background-color: white;
-    margin: 5% auto;
-    padding: 30px;
-    border-radius: 12px;
-    width: 90%;
+    margin: 10% auto;
+    padding: 20px;
+    width: 80%;
     max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     position: relative;
     animation: modalSlideIn 0.3s ease;
 }
@@ -305,13 +289,11 @@ tr:hover {
 
 /* Error Message */
 .error-message {
-    background-color: #fef2f2;
-    color: var(--danger-color);
-    padding: 12px;
+    background-color: #ff6b6b;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
     margin-bottom: 20px;
-    border-radius: 8px;
-    border: 1px solid #fee2e2;
-    font-size: 14px;
 }
 
 /* Success Message */
@@ -328,12 +310,8 @@ tr:hover {
 /* No Data Message */
 .no-data {
     text-align: center;
-    color: var(--gray-color);
-    padding: 30px;
-    font-style: italic;
-    background: white;
-    border-radius: 12px;
-    margin-top: 20px;
+    color: #666;
+    margin: 40px 0;
 }
 
 /* Class Actions */
@@ -375,4 +353,21 @@ tr:hover {
     .form-group select {
         padding: 10px;
     }
+}
+
+/* Error page styles */
+.error-container {
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.error-container h1 {
+    font-size: 48px;
+    color: #ff6b6b;
+    margin-bottom: 20px;
+}
+
+.error-container p {
+    color: #666;
+    margin-bottom: 30px;
 } 

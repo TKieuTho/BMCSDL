@@ -13,26 +13,28 @@
                 <h1>Danh sách Lớp</h1>
                 <p class="welcome-text">Xin chào, <%= staffName %></p>
             </div>
-            <a href="<%= BASE_URL %>/logout" class="logout-btn">Đăng xuất</a>
+            <div class="header-buttons">
+                <a href="<%= BASE_URL %>/logout" class="logout-btn">Đăng xuất</a>
+            </div>
         </header>
-        
-        <% if (typeof error !== 'undefined' && error) { %>
+
+        <% if (error) { %>
             <div class="error-message"><%= error %></div>
         <% } %>
 
-        <div class="classes-grid">
+        <div class="classes-list">
             <% if (classes.length === 0) { %>
                 <p class="no-data">Không có lớp nào được phân công</p>
             <% } else { %>
-                <% classes.forEach(function(class_) { %>
-                    <div class="class-card">
-                        <h2><%= class_.TENLOP %></h2>
-                        <p>Mã lớp: <%= class_.MALOP %></p>
-                        <div class="card-actions">
-                            <a href="<%= BASE_URL %>/class/<%= class_.MALOP %>" class="view-btn">Xem chi tiết</a>
+                <div class="class-grid">
+                    <% classes.forEach(function(classItem) { %>
+                        <div class="class-card">
+                            <h2><%= classItem.TENLOP %></h2>
+                            <p>Mã lớp: <%= classItem.MALOP %></p>
+                            <a href="<%= BASE_URL %>/classes/<%= classItem.MALOP %>" class="view-btn">Xem chi tiết</a>
                         </div>
-                    </div>
-                <% }); %>
+                    <% }); %>
+                </div>
             <% } %>
         </div>
     </div>

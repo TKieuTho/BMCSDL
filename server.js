@@ -94,39 +94,40 @@ app.get('/', (req, res) => {
 
 // Login route
 app.post('/login', async (req, res) => {
-    const { username, password } = req.body;
-    console.log('Login attempt:', { username, password }); // Debug log
+    const { manv, password } = req.body; 
+    console.log('Login attempt:', { manv, password }); 
 
     try {
-        // First, check if user exists
-        const userCheck = await sql.query`
-            SELECT TENDN, CONVERT(VARCHAR(MAX), MATKHAU) as MATKHAU_TEXT
+        // Check if user exists using MANV
+        const result = await sql.query`
+            SELECT MANV, CONVERT(VARCHAR(MAX), MATKHAU) as MATKHAU_TEXT, HOTEN, EMAIL, PUBKEY
             FROM NHANVIEN 
-            WHERE TENDN = ${username}
+            WHERE MANV = ${manv}
         `;
-        
-        console.log('User check result:', userCheck.recordset); // Debug log
 
-        if (userCheck.recordset.length === 0) {
+        console.log('User check result:', result.recordset);
+
+        if (result.recordset.length === 0) {
             return res.render('login', { 
-                error: 'Tên đăng nhập không tồn tại',
+                error: 'Mã nhân viên không tồn tại',
                 success: null 
             });
         }
 
-        const storedPassword = userCheck.recordset[0].MATKHAU_TEXT;
-        console.log('Stored password:', storedPassword); // Debug log
-        console.log('Input password:', password); // Debug log
+        const user = result.recordset[0];
+        const storedPassword = user.MATKHAU_TEXT;
+        console.log('Stored password:', storedPassword);
+        console.log('Input password:', password);
 
+        // TODO: Replace with secure password comparison (e.g., bcrypt)
         if (storedPassword === password) {
-            // If password matches, get user details
-            const result = await sql.query`
-                SELECT MANV, HOTEN, EMAIL, PUBKEY 
-                FROM NHANVIEN 
-                WHERE TENDN = ${username}
-            `;
-            
-            req.session.user = result.recordset[0];
+            // Store user details in session
+            req.session.user = {
+                MANV: user.MANV,
+                HOTEN: user.HOTEN,
+                EMAIL: user.EMAIL,
+                PUBKEY: user.PUBKEY
+            };
             return res.redirect('/classes');
         } else {
             return res.render('login', { 
@@ -157,7 +158,7 @@ app.post('/forgot-password', async (req, res) => {
         if (result.recordset.length === 0) {
             return res.json({
                 success: false,
-                error: 'Thông tin không chính xác'
+                error: 'Mã nhân viên hoặc email không chính xác'
             });
         }
 
