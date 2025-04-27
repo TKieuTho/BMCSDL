@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh sách Lớp - Hệ thống Quản lý Sinh viên</title>
+    <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-info">
+                <h1>Danh sách Lớp</h1>
+                <p class="welcome-text">Xin chào, <%= staffName %></p>
+            </div>
+            <a href="<%= BASE_URL %>/logout" class="logout-btn">Đăng xuất</a>
+        </header>
+        
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error-message"><%= error %></div>
+        <% } %>
+
+        <div class="classes-grid">
+            <% if (classes.length === 0) { %>
+                <p class="no-data">Không có lớp nào được phân công</p>
+            <% } else { %>
+                <% classes.forEach(function(class_) { %>
+                    <div class="class-card">
+                        <h2><%= class_.TENLOP %></h2>
+                        <p>Mã lớp: <%= class_.MALOP %></p>
+                        <div class="card-actions">
+                            <a href="<%= BASE_URL %>/class/<%= class_.MALOP %>" class="view-btn">Xem chi tiết</a>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html> 

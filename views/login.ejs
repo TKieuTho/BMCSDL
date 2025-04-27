@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - Hệ thống Quản lý Sinh viên</title>
+    <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1>Đăng nhập</h1>
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error-message"><%= error %></div>
+        <% } %>
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="success-message"><%= success %></div>
+        <% } %>
+        <form action="<%= BASE_URL %>/login" method="POST" id="loginForm">
+            <div class="form-group">
+                <label for="username">Tên đăng nhập:</label>
+                <input type="text" id="username" name="username" required placeholder="Nhập tên đăng nhập">
+            </div>
+            <div class="form-group">
+                <label for="password">Mật khẩu:</label>
+                <div class="password-field">
+                    <input type="password" id="password" name="password" required placeholder="Nhập mật khẩu">
+                    <i class="password-toggle fas fa-eye" onclick="togglePassword()"></i>
+                </div>
+            </div>
+            <div class="forgot-password">
+                <a href="#" onclick="showForgotPasswordModal()">Quên mật khẩu?</a>
+            </div>
+            <button type="submit">Đăng nhập</button>
+        </form>
+    </div>
+
+    <!-- Modal Quên mật khẩu -->
+    <div id="forgotPasswordModal" class="modal">
+        <div class="modal-content">
+            <h2>Khôi phục mật khẩu</h2>
+            <form action="<%= BASE_URL %>/forgot-password" method="POST" id="forgotPasswordForm">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" required placeholder="Nhập email đã đăng ký">
+                </div>
+                <div class="form-group">
+                    <label for="manv">Mã nhân viên:</label>
+                    <input type="text" id="manv" name="manv" required placeholder="Nhập mã nhân viên">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Gửi yêu cầu</button>
+                    <button type="button" class="cancel-btn" onclick="hideForgotPasswordModal()">Hủy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.querySelector('.password-toggle');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        function showForgotPasswordModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'block';
+        }
+
+        function hideForgotPasswordModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'none';
+        }
+
+        // Đóng modal khi click bên ngoài
+        window.onclick = function(event) {
+            const modal = document.getElementById('forgotPasswordModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Xử lý form quên mật khẩu
+        document.getElementById('forgotPasswordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const manv = document.getElementById('manv').value;
+            
+            // Gửi yêu cầu đến server
+            fetch('<%= BASE_URL %>/forgot-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, manv })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Yêu cầu khôi phục mật khẩu đã được gửi. Vui lòng kiểm tra email.');
+                    hideForgotPasswordModal();
+                } else {
+                    alert(data.error || 'Có lỗi xảy ra. Vui lòng thử lại.');
+                }
+            })
+            .catch(error => {
+                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chi tiết Lớp - Hệ thống Quản lý Sinh viên</title>
+    <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-info">
+                <h1>Chi tiết Lớp: <%= classInfo.TENLOP %></h1>
+                <p class="welcome-text">Xin chào, <%= staffName %></p>
+            </div>
+            <div class="header-buttons">
+                <a href="<%= BASE_URL %>/classes" class="back-btn">Quay lại</a>
+                <a href="<%= BASE_URL %>/logout" class="logout-btn">Đăng xuất</a>
+            </div>
+        </header>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error-message"><%= error %></div>
+        <% } %>
+
+        <div class="class-actions">
+            <button onclick="showAddStudentForm()" class="action-btn">Thêm Sinh viên</button>
+        </div>
+
+        <div id="addStudentForm" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h2>Thêm Sinh viên Mới</h2>
+                <form action="<%= BASE_URL %>/class/<%= classInfo.MALOP %>/add-student" method="POST">
+                    <div class="form-group">
+                        <label for="masv">Mã sinh viên:</label>
+                        <input type="text" id="masv" name="masv" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="hoten">Họ tên:</label>
+                        <input type="text" id="hoten" name="hoten" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ngaysinh">Ngày sinh:</label>
+                        <input type="date" id="ngaysinh" name="ngaysinh" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="diachi">Địa chỉ:</label>
+                        <input type="text" id="diachi" name="diachi">
+                    </div>
+                    <div class="form-group">
+                        <label for="tendn">Tên đăng nhập:</label>
+                        <input type="text" id="tendn" name="tendn" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="matkhau">Mật khẩu:</label>
+                        <input type="password" id="matkhau" name="matkhau" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Thêm</button>
+                        <button type="button" onclick="hideAddStudentForm()" class="cancel-btn">Hủy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="students-table">
+            <% if (students.length === 0) { %>
+                <p class="no-data">Chưa có sinh viên trong lớp</p>
+            <% } else { %>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mã SV</th>
+                            <th>Họ tên</th>
+                            <th>Ngày sinh</th>
+                            <th>Địa chỉ</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% students.forEach(function(student) { %>
+                            <tr>
+                                <td><%= student.MASV %></td>
+                                <td><%= student.HOTEN %></td>
+                                <td><%= new Date(student.NGAYSINH).toLocaleDateString('vi-VN') %></td>
+                                <td><%= student.DIACHI || 'N/A' %></td>
+                                <td>
+                                    <button onclick="showEditStudent('<%= student.MASV %>')" class="edit-btn">Sửa</button>
+                                    <button onclick="showAddGrade('<%= student.MASV %>')" class="grade-btn">Nhập điểm</button>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } %>
+        </div>
+
+        <div id="editStudentForm" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h2>Cập nhật Thông tin Sinh viên</h2>
+                <form id="editStudentFormContent">
+                    <input type="hidden" id="edit_masv" name="masv">
+                    <div class="form-group">
+                        <label for="edit_hoten">Họ tên:</label>
+                        <input type="text" id="edit_hoten" name="hoten" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_ngaysinh">Ngày sinh:</label>
+                        <input type="date" id="edit_ngaysinh" name="ngaysinh" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_diachi">Địa chỉ:</label>
+                        <input type="text" id="edit_diachi" name="diachi">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Cập nhật</button>
+                        <button type="button" onclick="hideEditStudentForm()" class="cancel-btn">Hủy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="addGradeForm" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h2>Nhập điểm</h2>
+                <form id="addGradeFormContent">
+                    <input type="hidden" id="grade_masv" name="masv">
+                    <div class="form-group">
+                        <label for="mahp">Học phần:</label>
+                        <select id="mahp" name="mahp" required>
+                            <option value="">Chọn học phần</option>
+                            <option value="HP001">Lập trình cơ bản</option>
+                            <option value="HP002">Cơ sở dữ liệu</option>
+                            <option value="HP003">Mạng máy tính</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="diemthi">Điểm thi:</label>
+                        <input type="number" id="diemthi" name="diemthi" step="0.1" min="0" max="10" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Lưu điểm</button>
+                        <button type="button" onclick="hideAddGradeForm()" class="cancel-btn">Hủy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showAddStudentForm() {
+            document.getElementById('addStudentForm').style.display = 'block';
+        }
+
+        function hideAddStudentForm() {
+            document.getElementById('addStudentForm').style.display = 'none';
+        }
+
+        function showEditStudent(masv) {
+            const form = document.getElementById('editStudentForm');
+            const formContent = document.getElementById('editStudentFormContent');
+            document.getElementById('edit_masv').value = masv;
+            form.style.display = 'block';
+            formContent.action = `<%= BASE_URL %>/student/${masv}/update`;
+        }
+
+        function hideEditStudentForm() {
+            document.getElementById('editStudentForm').style.display = 'none';
+        }
+
+        function showAddGrade(masv) {
+            const form = document.getElementById('addGradeForm');
+            const formContent = document.getElementById('addGradeFormContent');
+            document.getElementById('grade_masv').value = masv;
+            form.style.display = 'block';
+            formContent.action = `<%= BASE_URL %>/student/${masv}/grade`;
+        }
+
+        function hideAddGradeForm() {
+            document.getElementById('addGradeForm').style.display = 'none';
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.getElementsByClassName('modal');
+            for (let modal of modals) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        }
+    </script>
+</body>
+</html> 
