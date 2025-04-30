@@ -1,0 +1,150 @@
+
+
+
+#### Stored Procedures Chính 
+b. SP_INS_PUBLIC_NHANVIEN:
+   - Thêm nhân viên với mật khẩu (SHA1), lương (RSA_512), và Public Key.
+c. SP_SEL_PUBLIC_NHANVIEN:
+   - Truy vấn thông tin nhân viên với lương giải mã.
+
+#### Stored Procedures Phụ (Hỗ trợ ứng dụng)
+a. SP_LOGIN_NHANVIEN:
+   - Xác thực đăng nhập bằng 'MANV' và 'MATKHAU'.
+a. SP_SEL_LOP_BY_MANV:
+   - Lấy danh sách lớp do nhân viên quản lý.
+a. SP_SEL_SINHVIEN_BY_LOP:
+   - Lấy danh sách sinh viên theo lớp.
+b. SP_INS_SINHVIEN:
+   - Thêm mới sinh viên với mật khẩu mã hóa (SHA1).
+b. SP_UPD_SINHVIEN:
+   - Cập nhật thông tin sinh viên.
+c. SP_INS_UPD_BANGDIEM:
+   - Thêm/cập nhật điểm thi với điểm mã hóa bằng Public Key (RSA_512).
+c. SP_SEL_BANGDIEM:
+   - Truy vấn và giải mã điểm thi.
+a. SP_FORGOT_PASSWORD_NHANVIEN:
+    - Khôi phục mật khẩu nhân viên.
+
+
+
+
+#### 1.1. SP_INS_PUBLIC_NHANVIEN
+
+
+#### 1.2. SP_SEL_PUBLIC_NHANVIEN
+- Mục đích: Truy vấn thông tin nhân viên từ bảng 'NHANVIEN' với lương đã được giải mã.
+- Tham số:
+  - 'TENDN' (NVARCHAR(100)): Tên đăng nhập.
+  - 'MK' (NVARCHAR(MAX)): Mật khẩu (khóa bí mật để giải mã lương).
+- Xử lý:
+  - Kiểm tra thông tin nhân viên dựa trên 'TENDN' và mật khẩu đã mã hóa (SHA1).
+  - Giải mã cột 'LUONG' bằng thuật toán RSA_512 sử dụng khóa bí mật 'MK' để lấy giá trị 'LUONGCB'.
+- Kết quả: Trả về thông tin nhân viên gồm 'MANV', 'HOTEN', 'EMAIL', 'LUONGCB' (lương đã giải mã).
+
+---
+
+### 2. Stored Procedures Phụ Bổ Trợ
+#### 2.1. SP_LOGIN_NHANVIEN
+- Mục đích: Xác thực đăng nhập nhân viên bằng 'MANV' và 'MATKHAU'.
+- Tham số:
+  - 'MANV' (VARCHAR(20)): Mã nhân viên.
+  - 'MATKHAU' (NVARCHAR(MAX)): Mật khẩu (trước khi mã hóa).
+- Xử lý:
+  - Mã hóa 'MATKHAU' bằng SHA1 và so sánh với cột 'MATKHAU' trong bảng 'NHANVIEN' (vì mật khẩu trong bảng được lưu dưới dạng SHA1).
+  - Nếu khớp, trả về thông tin nhân viên ('MANV', 'HOTEN', 'EMAIL', 'PUBKEY').
+- Kết quả: Trả về thông tin nhân viên nếu đăng nhập thành công, hoặc không trả về dữ liệu nếu thất bại.
+- Ứng dụng: Hỗ trợ route '/login' trong backend để xác thực nhân viên.
+
+#### 2.2. SP_SEL_LOP_BY_MANV
+- Mục đích: Lấy danh sách các lớp do một nhân viên quản lý.
+- Tham số:
+  - 'MANV' (VARCHAR(20)): Mã nhân viên.
+- Xử lý:
+  - Truy vấn bảng 'LOP' để lấy tất cả các lớp có 'MANV' khớp với tham số đầu vào.
+- Kết quả: Trả về danh sách các lớp ('MALOP', 'TENLOP', 'MANV').
+- Ứng dụng: Hỗ trợ route '/classes' để hiển thị danh sách lớp học mà nhân viên quản lý.
+
+#### 2.3. SP_SEL_SINHVIEN_BY_LOP
+- Mục đích: Lấy danh sách sinh viên thuộc một lớp cụ thể.
+- Tham số:
+  - 'MALOP' (VARCHAR(20)): Mã lớp.
+  - 'MANV' (VARCHAR(20)): Mã nhân viên (để kiểm tra quyền truy cập).
+- Xử lý:
+  - Kiểm tra xem 'MALOP' có được quản lý bởi 'MANV' trong bảng 'LOP'.
+  - Nếu hợp lệ, truy vấn bảng 'SINHVIEN' để lấy danh sách sinh viên có 'MALOP' khớp.
+- Kết quả: Trả về thông tin sinh viên ('MASV', 'HOTEN', 'NGAYSINH', 'DIACHI', 'MALOP', 'TENDN') và thông tin lớp ('TENLOP').
+- Ứng dụng: Hỗ trợ route '/class/:id' để hiển thị danh sách sinh viên trong một lớp.
+
+#### 2.4. SP_INS_SINHVIEN
+- Mục đích: Thêm mới một sinh viên vào bảng 'SINHVIEN'.
+- Tham số:
+  - 'MASV' (NVARCHAR(20)): Mã sinh viên.
+  - 'HOTEN' (NVARCHAR(100)): Họ tên.
+  - 'NGAYSINH' (DATETIME): Ngày sinh.
+  - 'DIACHI' (NVARCHAR(200)): Địa chỉ.
+  - 'MALOP' (NVARCHAR(200)): Mã lớp.
+  - 'TENDN' (NVARCHAR(100)): Tên đăng nhập.
+  - 'MATKHAU' (NVARCHAR(MAX)): Mật khẩu (trước khi mã hóa).
+  - 'MANV' (VARCHAR(20)): Mã nhân viên (để kiểm tra quyền).
+- Xử lý:
+  - Kiểm tra xem 'MALOP' có được quản lý bởi 'MANV' trong bảng 'LOP'.
+  - Mã hóa 'MATKHAU' bằng SHA1 và lưu vào cột 'MATKHAU'.
+  - Thêm dòng mới vào bảng 'SINHVIEN'.
+- Kết quả: Thêm thành công hoặc báo lỗi nếu 'MALOP' không hợp lệ hoặc 'TENDN' trùng lặp.
+- Ứng dụng: Hỗ trợ route '/class/:id/add-student' để thêm sinh viên.
+
+#### 2.5. SP_UPD_SINHVIEN
+- Mục đích: Cập nhật thông tin sinh viên trong bảng 'SINHVIEN'.
+- Tham số:
+  - 'MASV' (NVARCHAR(20)): Mã sinh viên.
+  - 'HOTEN' (NVARCHAR(100)): Họ tên.
+  - 'NGAYSINH' (DATETIME): Ngày sinh.
+  - 'DIACHI' (NVARCHAR(200)): Địa chỉ.
+  - 'MANV' (VARCHAR(20)): Mã nhân viên (để kiểm tra quyền).
+- Xử lý:
+  - Kiểm tra xem sinh viên ('MASV') thuộc lớp do 'MANV' quản lý (dựa trên 'MALOP' trong bảng 'SINHVIEN' và 'LOP').
+  - Cập nhật các trường 'HOTEN', 'NGAYSINH', 'DIACHI' trong bảng 'SINHVIEN'.
+- Kết quả: Cập nhật thành công hoặc báo lỗi nếu không có quyền.
+- Ứng dụng: Hỗ trợ route '/student/:id/update' để cập nhật thông tin sinh viên.
+
+#### 2.6. SP_INS_UPD_BANGDIEM
+- Mục đích: Thêm mới hoặc cập nhật điểm thi của sinh viên trong bảng 'BANGDIEM', với điểm thi được mã hóa bằng Public Key của nhân viên.
+- Tham số:
+  - 'MASV' (VARCHAR(20)): Mã sinh viên.
+  - 'MAHP' (VARCHAR(20)): Mã học phần.
+  - 'DIEMTHI' (FLOAT): Điểm thi (trước khi mã hóa).
+  - 'MANV' (VARCHAR(20)): Mã nhân viên (để lấy Public Key và kiểm tra quyền).
+- Xử lý:
+  - Kiểm tra xem sinh viên ('MASV') thuộc lớp do 'MANV' quản lý (dựa trên 'MALOP' trong bảng 'SINHVIEN' và 'LOP').
+  - Lấy 'PUBKEY' của nhân viên từ bảng 'NHANVIEN' dựa trên 'MANV'.
+  - Mã hóa 'DIEMTHI' bằng thuật toán RSA_512 sử dụng 'PUBKEY'.
+  - Nếu bản ghi '(MASV, MAHP)' đã tồn tại trong 'BANGDIEM', cập nhật 'DIEMTHI'. Nếu không, thêm mới.
+- Kết quả: Thêm/cập nhật điểm thi đã mã hóa hoặc báo lỗi nếu không có quyền.
+- Ứng dụng: Hỗ trợ route '/student/:id/grade' để nhập/cập nhật điểm.
+
+#### 2.7. SP_SEL_BANGDIEM
+- Mục đích: Truy vấn điểm thi của sinh viên, giải mã điểm thi bằng khóa bí mật.
+- Tham số:
+  - 'MASV' (VARCHAR(20)): Mã sinh viên.
+  - 'MAHP' (VARCHAR(20)): Mã học phần.
+  - 'MANV' (VARCHAR(20)): Mã nhân viên (để lấy khóa bí mật và kiểm tra quyền).
+  - 'MK' (NVARCHAR(MAX)): Mật khẩu nhân viên (khóa bí mật để giải mã).
+- Xử lý:
+  - Kiểm tra xem sinh viên ('MASV') thuộc lớp do 'MANV' quản lý.
+  - Xác thực 'MK' bằng cách mã hóa SHA1 và so sánh với 'MATKHAU' trong bảng 'NHANVIEN'.
+  - Giải mã 'DIEMTHI' từ bảng 'BANGDIEM' bằng thuật toán RSA_512 sử dụng khóa bí mật 'MK'.
+- Kết quả: Trả về thông tin điểm thi ('MASV', 'MAHP', 'DIEMTHI' đã giải mã).
+- Ứng dụng: Hỗ trợ việc hiển thị điểm thi trong màn hình quản lý sinh viên hoặc lớp học.
+
+#### 2.8. SP_FORGOT_PASSWORD_NHANVIEN
+- Mục đích: Hỗ trợ khôi phục mật khẩu cho nhân viên dựa trên 'MANV' và 'EMAIL'.
+- Tham số:
+  - 'MANV' (VARCHAR(20)): Mã nhân viên.
+  - 'EMAIL' (VARCHAR(20)): Email nhân viên.
+  - 'NEW_MATKHAU' (NVARCHAR(MAX)): Mật khẩu mới (trước khi mã hóa).
+- Xử lý:
+  - Kiểm tra xem 'MANV' và 'EMAIL' có khớp với bản ghi trong bảng 'NHANVIEN'.
+  - Mã hóa 'NEW_MATKHAU' bằng SHA1 và cập nhật vào cột 'MATKHAU'.
+- Kết quả: Cập nhật mật khẩu mới hoặc báo lỗi nếu thông tin không hợp lệ.
+- Ứng dụng: Hỗ trợ route '/forgot-password' để gửi mật khẩu mới qua email.
+

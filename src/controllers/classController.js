@@ -1,53 +1,59 @@
 const { sql } = require('../config/database');
 
 const listClasses = async (req, res) => {
+    if (!req.session.user || !req.session.user.MANV) {
+        console.log('Session user missing or MANV undefined:', req.session.user);
+        return res.redirect('/auth/login');
+    }
+
     try {
-        const result = await sql.query`
-            SELECT * FROM LOP 
-            WHERE MANV = ${req.session.user.MANV}
-        `;
-        res.render('classes', { 
-            classes: result.recordset,
+        const pool = await sql.connect();
+        const request = pool.request();
+        request.input('MANV', sql.VarChar, req.session.user.MANV);
+
+        console.log('MANV from session:', req.session.user.MANV);
+
+        const result = await request.execute('SP_SEL_LOP_BY_MANV');
+
+        console.log('Query result:', result);
+        console.log('Classes data:', result.recordset);
+
+        res.render('classes', {
+            classes: result.recordset || [],
             staffName: req.session.user.HOTEN,
+            BASE_URL: process.env.BASE_URL || 'http://localhost:3001',
             error: null
         });
     } catch (err) {
         console.error('Error fetching classes:', err);
-        res.render('classes', { 
-            error: 'Không thể lấy danh sách lớp',
+        res.render('classes', {
             classes: [],
-            staffName: req.session.user.HOTEN
+            staffName: req.session.user.HOTEN || 'Unknown',
+            BASE_URL: process.env.BASE_URL || 'http://localhost:3001',
+            error: 'Không thể lấy danh sách lớp'
         });
     }
 };
-
 const getClassDetails = async (req, res) => {
     try {
         const classId = req.params.id;
+        const pool = await sql.connect();
         
-        // Check if the staff manages this class
-        const classCheck = await sql.query`
-            SELECT * FROM LOP 
-            WHERE MALOP = ${classId} 
-            AND MANV = ${req.session.user.MANV}
-        `;
-        
-        if (classCheck.recordset.length === 0) {
-            return res.redirect('/classes');
-        }
+        // Get students in the class using stored procedure
+        const request = pool.request();
+        request.input('MALOP', sql.VarChar, classId);
+        const result = await request.execute('SP_SEL_SINHVIEN_BY_LOP');
 
-        const studentsResult = await sql.query`
-            SELECT s.*, l.TENLOP
-            FROM SINHVIEN s
-            JOIN LOP l ON s.MALOP = l.MALOP
-            WHERE s.MALOP = ${classId}
+        // Get list of subjects for grade input
+        const subjectsRequest = pool.request();
+        const subjectsResult = await subjectsRequest.query`
+            SELECT * FROM HOCPHAN
         `;
-
-        const classInfo = classCheck.recordset[0];
         
         res.render('class-details', {
-            students: studentsResult.recordset,
-            classInfo: classInfo,
+            students: result.recordset,
+            subjects: subjectsResult.recordset,
+            classId: classId,
             staffName: req.session.user.HOTEN,
             error: null
         });
@@ -56,7 +62,8 @@ const getClassDetails = async (req, res) => {
         res.render('class-details', {
             error: 'Không thể lấy thông tin lớp',
             students: [],
-            classInfo: null,
+            subjects: [],
+            classId: null,
             staffName: req.session.user.HOTEN
         });
     }
@@ -64,24 +71,21 @@ const getClassDetails = async (req, res) => {
 
 const addStudent = async (req, res) => {
     const classId = req.params.id;
-    const { masv, hoten, ngaysinh, diachi, matkhau } = req.body;
+    const { masv, hoten, ngaysinh, diachi, tendn, matkhau } = req.body;
 
     try {
-        // Check if staff manages this class
-        const classCheck = await sql.query`
-            SELECT * FROM LOP 
-            WHERE MALOP = ${classId} 
-            AND MANV = ${req.session.user.MANV}
-        `;
+        const pool = await sql.connect();
+        const request = pool.request();
+        request.input('MASV', sql.VarChar, masv);
+        request.input('HOTEN', sql.NVarChar, hoten);
+        request.input('NGAYSINH', sql.Date, ngaysinh);
+        request.input('DIACHI', sql.NVarChar, diachi);
+        request.input('MALOP', sql.VarChar, classId);
+        request.input('TENDN', sql.NVarChar, tendn);
+        request.input('MK', sql.NVarChar, matkhau);
+        request.input('MANV', sql.VarChar, req.session.user.MANV);
 
-        if (classCheck.recordset.length === 0) {
-            return res.status(403).json({ error: 'Không có quyền thêm sinh viên vào lớp này' });
-        }
-
-        await sql.query`
-            INSERT INTO SINHVIEN (MASV, HOTEN, NGAYSINH, DIACHI, MALOP, MATKHAU)
-            VALUES (${masv}, ${hoten}, ${ngaysinh}, ${diachi}, ${classId}, CAST(${matkhau} AS VARBINARY(MAX)))
-        `;
+        await request.execute('SP_INS_SINHVIEN');
 
         res.redirect(`/class/${classId}`);
     } catch (err) {
@@ -92,31 +96,20 @@ const addStudent = async (req, res) => {
 
 const updateStudent = async (req, res) => {
     const studentId = req.params.id;
-    const { hoten, ngaysinh, diachi } = req.body;
+    const { hoten, ngaysinh, diachi, malop } = req.body;
 
     try {
-        // Check if staff manages this student's class
-        const studentCheck = await sql.query`
-            SELECT s.*, l.MANV 
-            FROM SINHVIEN s
-            JOIN LOP l ON s.MALOP = l.MALOP
-            WHERE s.MASV = ${studentId}
-        `;
+        const pool = await sql.connect();
+        const request = pool.request();
+        request.input('MASV', sql.VarChar, studentId);
+        request.input('HOTEN', sql.NVarChar, hoten);
+        request.input('NGAYSINH', sql.Date, ngaysinh);
+        request.input('DIACHI', sql.NVarChar, diachi);
+        request.input('MANV', sql.VarChar, req.session.user.MANV);
 
-        if (studentCheck.recordset.length === 0 || 
-            studentCheck.recordset[0].MANV !== req.session.user.MANV) {
-            return res.status(403).json({ error: 'Không có quyền cập nhật sinh viên này' });
-        }
+        await request.execute('SP_UPD_SINHVIEN');
 
-        await sql.query`
-            UPDATE SINHVIEN 
-            SET HOTEN = ${hoten},
-                NGAYSINH = ${ngaysinh},
-                DIACHI = ${diachi}
-            WHERE MASV = ${studentId}
-        `;
-
-        res.redirect(`/class/${studentCheck.recordset[0].MALOP}`);
+        res.redirect(`/class/${malop}`);
     } catch (err) {
         console.error('Error updating student:', err);
         res.status(500).json({ error: 'Không thể cập nhật thông tin sinh viên' });

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,10 @@
     <div class="error-container">
         <h1>Lỗi <%= error.status %></h1>
         <p><%= message %></p>
-        <a href="<%= BASE_URL %>" class="back-btn">Quay lại trang chủ</a>
+        <div class="error-actions">
+            <a href="<%= BASE_URL %>/auth/login" class="back-btn">Quay lại trang đăng nhập</a>
+            <a href="<%= BASE_URL %>" class="home-btn">Về trang chủ</a>
+        </div>
     </div>
 </body>
 </html> 

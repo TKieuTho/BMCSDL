@@ -5,12 +5,15 @@ const {
     listClasses, 
     getClassDetails, 
     addStudent, 
-    updateStudent 
+    updateStudent
 } = require('../controllers/classController');
+const { getClassGrades } = require('../controllers/gradeController');
 
 // Class routes
 router.get('/', requireLogin, listClasses);
 router.get('/:id', requireLogin, getClassDetails);
+router.get('/:id/grades', requireLogin, getClassGrades);
+router.post('/:id/grades', requireLogin, getClassGrades);
 router.post('/:id/add-student', requireLogin, addStudent);
 router.post('/student/:id/update', requireLogin, updateStudent);
 

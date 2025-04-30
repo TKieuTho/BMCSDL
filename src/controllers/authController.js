@@ -1,53 +1,57 @@
 const { sql } = require('../config/database');
 const transporter = require('../config/email');
+const retry = require('async-retry');
 
 const showLoginPage = (req, res) => {
     res.render('login', { error: null, success: null });
 };
+const showForgotPasswordPage = (req, res) => {
+    res.render('forgot-password', { error: null, success: null }); // Adjust template name as needed
+};
 
 const login = async (req, res) => {
     const { manv, password } = req.body;
-    console.log('Login attempt:', { manv, password });
+    console.log('Login attempt:', { manv });
 
     try {
-        const result = await sql.query`
-            SELECT MANV, CONVERT(VARCHAR(MAX), MATKHAU) as MATKHAU_TEXT, HOTEN, EMAIL, PUBKEY
-            FROM NHANVIEN 
-            WHERE MANV = ${manv}
-        `;
+        const pool = await sql.connect();
+        const request = pool.request();
+        request.input('MANV', sql.VarChar, manv);
+        request.input('MATKHAU', sql.NVarChar, password);
 
-        console.log('User check result:', result.recordset);
+        const result = await request.execute('SP_LOGIN_NHANVIEN');
 
-        if (result.recordset.length === 0) {
-            return res.render('login', {
-                error: 'Mã nhân viên không tồn tại',
-                success: null
-            });
-        }
+        console.log('Login result:', result.recordset); // Debug log
 
-        const user = result.recordset[0];
-        const storedPassword = user.MATKHAU_TEXT;
-
-        if (storedPassword === password) {
+        if (result.recordset && result.recordset.length > 0) {
+            const user = result.recordset[0];
             req.session.user = {
                 MANV: user.MANV,
-                HOTEN: user.HOTEN,
-                EMAIL: user.EMAIL,
-                PUBKEY: user.PUBKEY
+                HOTEN: user.HOTEN
             };
-            return res.redirect('/classes');
-        } else {
-            return res.render('login', {
-                error: 'Mật khẩu không chính xác',
-                success: null
+            console.log('Session user set:', req.session.user);
+            req.session.save((err) => {
+                if (err) {
+                    console.error('Session save error:', err);
+                }
+                res.redirect('/class');
             });
+        } else {
+            res.render('login', { error: 'Mã nhân viên hoặc mật khẩu không đúng' });
         }
     } catch (err) {
         console.error('Login error:', err);
-        res.render('login', {
-            error: 'Đăng nhập thất bại: ' + err.message,
-            success: null
-        });
+        let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại sau.';
+        if (err.message.includes('Nhân viên không tồn tại')) {
+            errorMessage = 'Nhân viên không tồn tại';
+        } else if (err.message.includes('Mật khẩu không đúng')) {
+            errorMessage = 'Mật khẩu không đúng';
+        } else if (err.code === 'ETIMEOUT') {
+            errorMessage = 'Không thể kết nối đến cơ sở dữ liệu. Vui lòng thử lại sau.';
+        } else if (err.code === 'EREQUEST') {
+            errorMessage = 'Lỗi truy vấn cơ sở dữ liệu. Vui lòng liên hệ quản trị viên.';
+        }
+        res.render('login', { error: errorMessage });
     }
 };
 
@@ -123,5 +127,6 @@ module.exports = {
     showLoginPage,
     login,
     forgotPassword,
+    showForgotPasswordPage, 
     logout
 }; 

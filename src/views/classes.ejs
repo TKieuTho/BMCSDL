@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Danh sách Lớp - Hệ thống Quản lý Sinh viên</title>
     <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
+    <link rel="stylesheet" href="<%= BASE_URL %>/css/classes.css">
 </head>
 <body>
     <div class="container">
@@ -14,7 +15,7 @@
                 <p class="welcome-text">Xin chào, <%= staffName %></p>
             </div>
             <div class="header-buttons">
-                <a href="<%= BASE_URL %>/logout" class="logout-btn">Đăng xuất</a>
+                <a href="<%= BASE_URL %>/auth/logout" class="logout-btn">Đăng xuất</a>
             </div>
         </header>
 
@@ -31,7 +32,7 @@
                         <div class="class-card">
                             <h2><%= classItem.TENLOP %></h2>
                             <p>Mã lớp: <%= classItem.MALOP %></p>
-                            <a href="<%= BASE_URL %>/classes/<%= classItem.MALOP %>" class="view-btn">Xem chi tiết</a>
+                            <a href="<%= BASE_URL %>/class/<%= classItem.MALOP %>" class="view-btn">Xem chi tiết</a>
                         </div>
                     <% }); %>
                 </div>
