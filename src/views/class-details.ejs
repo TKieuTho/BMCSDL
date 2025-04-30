@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -16,10 +15,18 @@
                 <p class="welcome-text">Xin chào, <%= staffName %></p>
             </div>
             <div class="header-buttons">
-                <button onclick="showAddStudentForm()" class="action-btn">Thêm Sinh viên</button>
-                <a href="<%= BASE_URL %>/class/<%= classId %>/grades" class="btn">Xem bảng điểm</a>
-                <a href="<%= BASE_URL %>/class" class="back-btn">Quay lại</a>
-                <a href="<%= BASE_URL %>/auth/logout" class="logout-btn">Đăng xuất</a>
+                <button onclick="showAddStudentForm()" class="action-btn">
+                    <span class="btn-icon"></span> Thêm Sinh viên
+                </button>
+                <a href="<%= BASE_URL %>/class/<%= classId %>/grades" class="view-grades-btn">
+                    <span class="btn-icon"></span> Xem bảng điểm
+                </a>
+                <button onclick="window.location.href='<%= BASE_URL %>/class'" class="back-btn">
+                    <span class="btn-icon"></span> Quay lại
+                </button>
+                <button onclick="confirmLogout()" class="logout-btn">
+                    <span class="btn-icon"></span> Đăng xuất
+                </button>
             </div>
         </header>
 
@@ -56,8 +63,12 @@
                                         data-hoten="<%= student.HOTEN %>"
                                         data-ngaysinh="<%= new Date(student.NGAYSINH).toISOString().split('T')[0] %>"
                                         data-diachi="<%= student.DIACHI || '' %>"
-                                        onclick="showEditStudent(this)">Sửa</button>
-                                    <button onclick="showAddGrade('<%= student.MASV %>')" class="grade-btn">Nhập điểm</button>
+                                        onclick="showEditStudent(this)">
+                                        <span class="btn-icon"></span> Sửa
+                                    </button>
+                                    <button onclick="showAddGrade('<%= student.MASV %>')" class="grade-btn">
+                                        <span class="btn-icon"></span> Nhập điểm
+                                    </button>
                                 </td>
                             </tr>
                         <% }); %>
@@ -96,8 +107,12 @@
                         <input type="password" id="matkhau" name="matkhau" required>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="submit-btn">Thêm</button>
-                        <button type="button" onclick="hideAddStudentForm()" class="cancel-btn">Hủy</button>
+                        <button type="submit" class="submit-btn">
+                            <span class="btn-icon"></span> Thêm
+                        </button>
+                        <button type="button" onclick="hideAddStudentForm()" class="cancel-btn">
+                            <span class="btn-icon"></span> Hủy
+                        </button>
                     </div>
                 </form>
             </div>
@@ -123,8 +138,12 @@
                         <input type="text" id="edit_diachi" name="diachi">
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="submit-btn">Cập nhật</button>
-                        <button type="button" onclick="hideEditStudentForm()" class="cancel-btn">Hủy</button>
+                        <button type="submit" class="submit-btn">
+                            <span class="btn-icon"></span> Cập nhật
+                        </button>
+                        <button type="button" onclick="hideEditStudentForm()" class="cancel-btn">
+                            <span class="btn-icon"></span> Hủy
+                        </button>
                     </div>
                 </form>
             </div>
@@ -151,8 +170,12 @@
                         <input type="number" id="diemthi" name="diemthi" step="0.1" min="0" max="10" required>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="submit-btn">Lưu điểm</button>
-                        <button type="button" onclick="hideAddGradeForm()" class="cancel-btn">Hủy</button>
+                        <button type="submit" class="submit-btn">
+                            <span class="btn-icon"></span> Lưu điểm
+                        </button>
+                        <button type="button" onclick="hideAddGradeForm()" class="cancel-btn">
+                            <span class="btn-icon"></span> Hủy
+                        </button>
                     </div>
                 </form>
             </div>
@@ -174,6 +197,7 @@
             document.getElementById('edit_hoten').value = button.dataset.hoten;
             document.getElementById('edit_ngaysinh').value = button.dataset.ngaysinh;
             document.getElementById('edit_diachi').value = button.dataset.diachi;
+            console.log('MASV set to:', button.dataset.masv); // Debug log
             form.style.display = 'block';
         }
 
@@ -189,6 +213,13 @@
 
         function hideAddGradeForm() {
             document.getElementById('addGradeForm').style.display = 'none';
+        }
+
+        function confirmLogout() {
+            console.log('Logout clicked by user:', '<%= staffName %>');
+            if (confirm('Bạn có chắc muốn đăng xuất?')) {
+                window.location.href = '<%= BASE_URL %>/auth/logout';
+            }
         }
 
         function submitGrade(event) {
@@ -218,7 +249,6 @@
                 if (data.success) {
                     alert('Cập nhật điểm thành công!');
                     hideAddGradeForm();
-                    // Reload the page to show updated grades
                     window.location.reload();
                 } else {
                     alert(data.error || 'Có lỗi xảy ra khi cập nhật điểm');
@@ -247,7 +277,6 @@
             e.preventDefault();
             
             try {
-                // Create a regular object from form data
                 const formData = new URLSearchParams(new FormData(this)).toString();
                 
                 const response = await fetch(this.action, {
@@ -260,13 +289,10 @@
                 });
 
                 const result = await response.json();
-                console.log('Server response:', result); // Debug log
+                console.log('Server response:', result);
 
                 if (result.success) {
-                    // Hide the form
                     hideEditStudentForm();
-                    
-                    // Update the table with new data
                     const tbody = document.querySelector('.students-table tbody');
                     if (result.data && result.data.students && result.data.students.length > 0) {
                         tbody.innerHTML = result.data.students.map(student => `
@@ -282,29 +308,30 @@
                                         data-hoten="${student.HOTEN}"
                                         data-ngaysinh="${new Date(student.NGAYSINH).toISOString().split('T')[0]}"
                                         data-diachi="${student.DIACHI || ''}"
-                                        onclick="showEditStudent(this)">Sửa</button>
-                                    <button onclick="showAddGrade('${student.MASV}')" class="grade-btn">Nhập điểm</button>
+                                        onclick="showEditStudent(this)">
+                                        <span class="btn-icon"></span> Sửa
+                                    </button>
+                                    <button onclick="showAddGrade('${student.MASV}')" class="grade-btn">
+                                        <span class="btn-icon"></span> Nhập điểm
+                                    </button>
                                 </td>
                             </tr>
                         `).join('');
                     } else {
-                        console.log('No students data received'); // Debug log
+                        console.log('No students data received');
                         tbody.innerHTML = '<tr><td colspan="6">Không có sinh viên nào trong lớp</td></tr>';
                     }
 
-                    // Show success message
                     const message = document.createElement('div');
                     message.className = 'success-message';
                     message.textContent = result.message || 'Cập nhật thành công';
                     document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
                     setTimeout(() => message.remove(), 3000);
-
                 } else {
                     throw new Error(result.error || 'Cập nhật thất bại');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                // Show error message
                 const message = document.createElement('div');
                 message.className = 'error-message';
                 message.textContent = error.message || 'Không thể cập nhật thông tin sinh viên';
@@ -314,4 +341,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
