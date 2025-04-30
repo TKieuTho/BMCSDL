@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -240,6 +241,77 @@
                 }
             }
         }
+
+        // Update the form submission handler
+        document.getElementById('editStudentFormContent').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                // Create a regular object from form data
+                const formData = new URLSearchParams(new FormData(this)).toString();
+                
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('Server response:', result); // Debug log
+
+                if (result.success) {
+                    // Hide the form
+                    hideEditStudentForm();
+                    
+                    // Update the table with new data
+                    const tbody = document.querySelector('.students-table tbody');
+                    if (result.data && result.data.students && result.data.students.length > 0) {
+                        tbody.innerHTML = result.data.students.map(student => `
+                            <tr>
+                                <td>${student.MASV}</td>
+                                <td>${student.HOTEN}</td>
+                                <td>${new Date(student.NGAYSINH).toLocaleDateString('vi-VN')}</td>
+                                <td>${student.DIACHI || 'N/A'}</td>
+                                <td>${student.TENDN || ''}</td>
+                                <td>
+                                    <button class="edit-btn" 
+                                        data-masv="${student.MASV}"
+                                        data-hoten="${student.HOTEN}"
+                                        data-ngaysinh="${new Date(student.NGAYSINH).toISOString().split('T')[0]}"
+                                        data-diachi="${student.DIACHI || ''}"
+                                        onclick="showEditStudent(this)">Sửa</button>
+                                    <button onclick="showAddGrade('${student.MASV}')" class="grade-btn">Nhập điểm</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        console.log('No students data received'); // Debug log
+                        tbody.innerHTML = '<tr><td colspan="6">Không có sinh viên nào trong lớp</td></tr>';
+                    }
+
+                    // Show success message
+                    const message = document.createElement('div');
+                    message.className = 'success-message';
+                    message.textContent = result.message || 'Cập nhật thành công';
+                    document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
+                    setTimeout(() => message.remove(), 3000);
+
+                } else {
+                    throw new Error(result.error || 'Cập nhật thất bại');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                // Show error message
+                const message = document.createElement('div');
+                message.className = 'error-message';
+                message.textContent = error.message || 'Không thể cập nhật thông tin sinh viên';
+                document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
+                setTimeout(() => message.remove(), 3000);
+            }
+        });
     </script>
 </body>
 </html> 

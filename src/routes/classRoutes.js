@@ -15,6 +15,6 @@ router.get('/:id', requireLogin, getClassDetails);
 router.get('/:id/grades', requireLogin, getClassGrades);
 router.post('/:id/grades', requireLogin, getClassGrades);
 router.post('/:id/add-student', requireLogin, addStudent);
-router.post('/student/:id/update', requireLogin, updateStudent);
+router.post('/student/:classId/update', requireLogin, updateStudent);
 
 module.exports = router; 
