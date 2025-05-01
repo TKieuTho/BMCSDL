@@ -5,6 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bảng điểm Lớp <%= classId %> - Hệ thống Quản lý Sinh viên</title>
     <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
+    <style>
+        .edit-grade-btn, .update-grade-btn, .cancel-grade-btn {
+            cursor: pointer;
+            color: #3498db;
+            font-size: 14px;
+            margin: 0 5px;
+            text-decoration: underline;
+        }
+        .edit-grade-btn:hover, .update-grade-btn:hover, .cancel-grade-btn:hover {
+            color: #2980b9;
+        }
+        .grade-input {
+            width: 60px;
+            padding: 2px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .error-message {
+            color: #e74c3c;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e74c3c;
+            border-radius: 4px;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            margin: 0 5px;
+            border: 1px solid #3498db;
+            background-color: #fff;
+            color: #3498db;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .pagination button:hover {
+            background-color: #3498db;
+            color: #fff;
+        }
+        .pagination button.active {
+            background-color: #3498db;
+            color: #fff;
+            font-weight: bold;
+        }
+        .pagination button:disabled {
+            border-color: #ccc;
+            color: #ccc;
+            cursor: not-allowed;
+        }
+        .subject-filter {
+            margin-bottom: 20px;
+        }
+        .subject-filter select {
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -31,61 +94,238 @@
             </form>
         <% } else { %>
             <div class="grades-container">
-                <div style="margin-bottom: 20px; padding: 10px; background: #f5f5f5;">
-                    <h3>Debug Information:</h3>
-                    <p>Number of students: <%= students.length %></p>
-                    <p>First student data: <%= JSON.stringify(students[0]) %></p>
-                    <p>Subjects: <%= JSON.stringify(subjects) %></p>
+                <div class="subject-filter">
+                    <label for="subject-select">Chọn môn học:</label>
+                    <select id="subject-select">
+                        <% subjects.forEach(subject => { %>
+                            <% if (subject.MAHP) { %>
+                                <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
+                            <% } %>
+                        <% }); %>
+                    </select>
                 </div>
-                
                 <div class="grades-table">
                     <table>
-                        <thead>
+                        <thead id="grades-thead">
                             <tr>
                                 <th>Mã SV</th>
                                 <th>Họ tên</th>
-                                <% subjects.forEach(subject => { %>
-                                    <th><%= subject.TENHP %></th>
-                                <% }); %>
-                                <th>Điểm TB</th>
+                                <th>Điểm</th>
+                                <th>Hành động</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <% students.forEach(student => { %>
-                                <tr>
-                                    <td><%= student.MASV %></td>
-                                    <td><%= student.HOTEN %></td>
-                                    <% subjects.forEach(subject => { %>
-                                        <td>
-                                            <% 
-                                                const grade = student.grades && student.grades[subject.MAHP];
-                                                if (grade !== undefined && grade !== null) {
-                                                    const color = grade >= 5 ? '#2ecc71' : '#e74c3c';
-                                                    const gradeText = grade.toFixed(1);
-                                            %>
-                                                <span class="grade-value" style="color: <%= color %>"><%= gradeText %></span>
-                                            <% } else { %>
-                                                <span class="grade-value" style="color: #95a5a6">-</span>
-                                            <% } %>
-                                        </td>
-                                    <% }); %>
-                                    <td>
-                                        <% 
-                                            const grades = student.grades ? Object.values(student.grades).filter(g => g !== null && g !== undefined) : [];
-                                            const avgGrade = grades.length > 0 
-                                                ? (grades.reduce((sum, g) => sum + g, 0) / grades.length).toFixed(1)
-                                                : '-';
-                                            const color = avgGrade !== '-' && avgGrade >= 5 ? '#2ecc71' : '#e74c3c';
-                                        %>
-                                        <span class="grade-value" style="color: <%= color %>"><%= avgGrade %></span>
-                                    </td>
-                                </tr>
-                            <% }); %>
+                        <tbody id="grades-tbody">
+                            <!-- Sinh viên sẽ được render bằng JavaScript -->
                         </tbody>
                     </table>
+                    <div class="pagination" id="pagination"></div>
                 </div>
             </div>
         <% } %>
     </div>
+
+    <script>
+        const students = <%- JSON.stringify(students) %>;
+        const subjects = <%- JSON.stringify(subjects) %>;
+        const itemsPerPage = 7;
+        let currentPage = 1;
+        let selectedSubject = subjects[0]?.MAHP || '';
+        let totalPages = Math.ceil(students.length / itemsPerPage);
+
+        function renderStudents(page) {
+            const tbody = document.getElementById('grades-tbody');
+            tbody.innerHTML = '';
+            if (!selectedSubject) {
+                students.forEach(student => {
+                    const row = document.createElement('tr');
+                    row.dataset.masv = student.MASV;
+                    row.dataset.malop = '<%= classId %>';
+                    row.innerHTML = `
+                        <td>${student.MASV}</td>
+                        <td>${student.HOTEN}</td>
+                        <td>-</td>
+                        <td>-</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                return;
+            }
+            const start = (page - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            students.slice(start, end).forEach(student => {
+                const row = document.createElement('tr');
+                row.dataset.masv = student.MASV;
+                row.dataset.malop = '<%= classId %>';
+                const grade = student.grades && student.grades[selectedSubject];
+                let gradeText = '-';
+                let color = '#95a5a6';
+                if (grade !== undefined && grade !== null) {
+                    gradeText = grade.toFixed(1);
+                    color = grade >= 5 ? '#2ecc71' : '#e74c3c';
+                }
+                row.innerHTML = `
+                    <td>${student.MASV}</td>
+                    <td>${student.HOTEN}</td>
+                    <td>
+                        <span class="grade-value" style="color: ${color}" data-mahp="${selectedSubject}">${gradeText}</span>
+                    </td>
+                    <td>
+                        <span class="edit-grade-btn">[Sửa]</span>
+                        <span class="update-grade-btn" style="display: none;">[Lưu]</span>
+                        <span class="cancel-grade-btn" style="display: none;">[Hủy]</span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            attachEventListeners();
+        }
+
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Trước';
+            prevButton.disabled = currentPage === 1 || !selectedSubject;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderStudents(currentPage);
+                    renderPagination();
+                }
+            });
+            pagination.appendChild(prevButton);
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.disabled = !selectedSubject;
+                if (i === currentPage && selectedSubject) pageButton.classList.add('active');
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    renderStudents(currentPage);
+                    renderPagination();
+                });
+                pagination.appendChild(pageButton);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Sau';
+            nextButton.disabled = currentPage === totalPages || !selectedSubject;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderStudents(currentPage);
+                    renderPagination();
+                }
+            });
+            pagination.appendChild(nextButton);
+        }
+
+        function attachEventListeners() {
+            document.querySelectorAll('.edit-grade-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const row = e.target.closest('tr');
+                    const gradeCell = row.querySelector('.grade-value');
+                    const mahp = gradeCell.dataset.mahp;
+                    if (mahp && mahp !== 'undefined') {
+                        const currentGrade = gradeCell.textContent !== '-' ? gradeCell.textContent : '';
+                        gradeCell.innerHTML = `<input type="number" class="grade-input" step="0.1" min="0" max="10" value="${currentGrade}" data-mahp="${mahp}">`;
+                    }
+                    row.querySelector('.edit-grade-btn').style.display = 'none';
+                    row.querySelector('.update-grade-btn').style.display = 'inline';
+                    row.querySelector('.cancel-grade-btn').style.display = 'inline';
+                });
+            });
+
+            document.querySelectorAll('.cancel-grade-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    renderStudents(currentPage);
+                });
+            });
+
+            document.querySelectorAll('.update-grade-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const row = e.target.closest('tr');
+                    const masv = row.dataset.masv;
+                    const malop = row.dataset.malop;
+                    const input = row.querySelector('.grade-input');
+                    const mahp = input.dataset.mahp;
+                    const diemthi = input.value.trim();
+
+                    if (diemthi && (isNaN(diemthi) || diemthi < 0 || diemthi > 10)) {
+                        alert('Vui lòng nhập điểm hợp lệ (0-10)!');
+                        return;
+                    }
+
+                    if (!diemthi && diemthi !== '0') {
+                        alert('Vui lòng nhập điểm hợp lệ!');
+                        return;
+                    }
+
+                    if (!confirm('Bạn có chắc chắn muốn lưu điểm này?')) return;
+
+                    try {
+                        const grade = { mahp, diemthi: parseFloat(diemthi), malop };
+                        console.log('Sending grade update:', { masv, ...grade });
+                        const response = await fetch(`<%= BASE_URL %>/grades/${masv}/grade`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(grade)
+                        });
+
+                        const text = await response.text();
+                        console.log('Response status:', response.status, 'Response:', text);
+
+                        let result;
+                        try {
+                            result = JSON.parse(text);
+                        } catch (err) {
+                            throw new Error(`Phản hồi không phải JSON: ${text}`);
+                        }
+
+                        if (!result.success) {
+                            throw new Error(result.error || 'Lỗi khi cập nhật điểm');
+                        }
+
+                        const cell = row.querySelector(`.grade-value[data-mahp="${mahp}"]`);
+                        cell.textContent = parseFloat(diemthi).toFixed(1);
+                        cell.style.color = diemthi >= 5 ? '#2ecc71' : '#e74c3c';
+                        if (!students.find(s => s.MASV === masv).grades) {
+                            students.find(s => s.MASV === masv).grades = {};
+                        }
+                        students.find(s => s.MASV === masv).grades[mahp] = parseFloat(diemthi);
+
+                        row.querySelector('.edit-grade-btn').style.display = 'inline';
+                        row.querySelector('.update-grade-btn').style.display = 'none';
+                        row.querySelector('.cancel-grade-btn').style.display = 'none';
+
+                        alert('Cập nhật điểm thành công!');
+                    } catch (err) {
+                        console.error('Error updating grades:', err);
+                        alert('Đã xảy ra lỗi: ' + err.message);
+                    }
+                });
+            });
+        }
+
+        document.getElementById('subject-select')?.addEventListener('change', (e) => {
+            selectedSubject = e.target.value;
+            currentPage = 1;
+            renderStudents(currentPage);
+            renderPagination();
+        });
+
+        console.log('Subjects data:', subjects);
+        console.log('Students data:', students);
+
+        if (students.length > 0 && selectedSubject) {
+            document.getElementById('subject-select').value = selectedSubject;
+            renderStudents(currentPage);
+            renderPagination();
+        }
+    </script>
 </body>
 </html>

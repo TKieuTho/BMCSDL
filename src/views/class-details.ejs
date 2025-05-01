@@ -6,6 +6,36 @@
     <title>Chi tiết Lớp</title>
     <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
     <link rel="stylesheet" href="<%= BASE_URL %>/css/classDetail.css">
+    <style>
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            margin: 0 5px;
+            border: 1px solid #3498db;
+            background-color: #fff;
+            color: #3498db;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .pagination button:hover {
+            background-color: #3498db;
+            color: #fff;
+        }
+        .pagination button.active {
+            background-color: #3498db;
+            color: #fff;
+            font-weight: bold;
+        }
+        .pagination button:disabled {
+            border-color: #ccc;
+            color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -49,31 +79,11 @@
                             <th>Thao tác</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <% students.forEach(function(student) { %>
-                            <tr>
-                                <td><%= student.MASV %></td>
-                                <td><%= student.HOTEN %></td>
-                                <td><%= new Date(student.NGAYSINH).toLocaleDateString('vi-VN') %></td>
-                                <td><%= student.DIACHI || 'N/A' %></td>
-                                <td><%= student.TENDN %></td>
-                                <td>
-                                    <button class="edit-btn" 
-                                        data-masv="<%= student.MASV %>"
-                                        data-hoten="<%= student.HOTEN %>"
-                                        data-ngaysinh="<%= new Date(student.NGAYSINH).toISOString().split('T')[0] %>"
-                                        data-diachi="<%= student.DIACHI || '' %>"
-                                        onclick="showEditStudent(this)">
-                                        <span class="btn-icon"></span> Sửa
-                                    </button>
-                                    <button onclick="showAddGrade('<%= student.MASV %>')" class="grade-btn">
-                                        <span class="btn-icon"></span> Nhập điểm
-                                    </button>
-                                </td>
-                            </tr>
-                        <% }); %>
+                    <tbody id="students-tbody">
+                        <!-- Sinh viên sẽ được render bằng JavaScript -->
                     </tbody>
                 </table>
+                <div class="pagination" id="pagination"></div>
             <% } %>
         </div>
 
@@ -137,6 +147,7 @@
                         <label for="edit_diachi">Địa chỉ:</label>
                         <input type="text" id="edit_diachi" name="diachi">
                     </div>
+                    yür
                     <div class="form-actions">
                         <button type="submit" class="submit-btn">
                             <span class="btn-icon"></span> Cập nhật
@@ -148,41 +159,83 @@
                 </form>
             </div>
         </div>
-
-        <!-- Add Grade Form -->
-        <div id="addGradeForm" class="modal" style="display: none;">
-            <div class="modal-content">
-                <h2>Nhập điểm</h2>
-                <form id="addGradeFormContent" onsubmit="return submitGrade(event)">
-                    <input type="hidden" id="grade_masv" name="masv">
-                    <input type="hidden" id="grade_malop" name="malop" value="<%= classId %>">
-                    <div class="form-group">
-                        <label for="mahp">Học phần:</label>
-                        <select id="mahp" name="mahp" required>
-                            <option value="">Chọn học phần</option>
-                            <% subjects.forEach(function(subject) { %>
-                                <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
-                            <% }); %>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="diemthi">Điểm thi:</label>
-                        <input type="number" id="diemthi" name="diemthi" step="0.1" min="0" max="10" required>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="submit-btn">
-                            <span class="btn-icon"></span> Lưu điểm
-                        </button>
-                        <button type="button" onclick="hideAddGradeForm()" class="cancel-btn">
-                            <span class="btn-icon"></span> Hủy
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
     </div>
 
     <script>
+        const students = <%- JSON.stringify(students) %>;
+        const itemsPerPage = 7;
+        let currentPage = 1;
+        const totalPages = Math.ceil(students.length / itemsPerPage);
+
+        function renderStudents(page) {
+            const tbody = document.getElementById('students-tbody');
+            tbody.innerHTML = '';
+            const start = (page - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            students.slice(start, end).forEach(student => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${student.MASV}</td>
+                    <td>${student.HOTEN}</td>
+                    <td>${new Date(student.NGAYSINH).toLocaleDateString('vi-VN')}</td>
+                    <td>${student.DIACHI || 'N/A'}</td>
+                    <td>${student.TENDN}</td>
+                    <td>
+                        <button class="edit-btn" 
+                            data-masv="${student.MASV}"
+                            data-hoten="${student.HOTEN}"
+                            data-ngaysinh="${new Date(student.NGAYSINH).toISOString().split('T')[0]}"
+                            data-diachi="${student.DIACHI || ''}"
+                            onclick="showEditStudent(this)">
+                            <span class="btn-icon"></span> Sửa
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Trước';
+            prevButton.disabled = currentPage === 1;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderStudents(currentPage);
+                    renderPagination();
+                }
+            });
+            pagination.appendChild(prevButton);
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                if (i === currentPage) pageButton.classList.add('active');
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    renderStudents(currentPage);
+                    renderPagination();
+                });
+                pagination.appendChild(pageButton);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Sau';
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderStudents(currentPage);
+                    renderPagination();
+                }
+            });
+            pagination.appendChild(nextButton);
+        }
+
         function showAddStudentForm() {
             document.getElementById('addStudentForm').style.display = 'block';
         }
@@ -197,22 +250,12 @@
             document.getElementById('edit_hoten').value = button.dataset.hoten;
             document.getElementById('edit_ngaysinh').value = button.dataset.ngaysinh;
             document.getElementById('edit_diachi').value = button.dataset.diachi;
-            console.log('MASV set to:', button.dataset.masv); // Debug log
+            console.log('MASV set to:', button.dataset.masv);
             form.style.display = 'block';
         }
 
         function hideEditStudentForm() {
             document.getElementById('editStudentForm').style.display = 'none';
-        }
-
-        function showAddGrade(masv) {
-            const form = document.getElementById('addGradeForm');
-            document.getElementById('grade_masv').value = masv;
-            form.style.display = 'block';
-        }
-
-        function hideAddGradeForm() {
-            document.getElementById('addGradeForm').style.display = 'none';
         }
 
         function confirmLogout() {
@@ -222,47 +265,6 @@
             }
         }
 
-        function submitGrade(event) {
-            event.preventDefault();
-            const form = event.target;
-            const studentId = document.getElementById('grade_masv').value;
-            const formData = {
-                mahp: form.querySelector('[name="mahp"]').value,
-                diemthi: parseFloat(form.querySelector('[name="diemthi"]').value),
-                malop: form.querySelector('[name="malop"]').value
-            };
-
-            fetch(`<%= BASE_URL %>/grades/student/${studentId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    alert('Cập nhật điểm thành công!');
-                    hideAddGradeForm();
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Có lỗi xảy ra khi cập nhật điểm');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Có lỗi xảy ra khi cập nhật điểm. Vui lòng thử lại.');
-            });
-
-            return false;
-        }
-
-        // Close modals when clicking outside
         window.onclick = function(event) {
             const modals = document.getElementsByClassName('modal');
             for (let modal of modals) {
@@ -272,13 +274,10 @@
             }
         }
 
-        // Update the form submission handler
         document.getElementById('editStudentFormContent').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
             try {
                 const formData = new URLSearchParams(new FormData(this)).toString();
-                
                 const response = await fetch(this.action, {
                     method: 'POST',
                     headers: {
@@ -287,41 +286,19 @@
                     },
                     body: formData
                 });
-
                 const result = await response.json();
                 console.log('Server response:', result);
-
                 if (result.success) {
                     hideEditStudentForm();
-                    const tbody = document.querySelector('.students-table tbody');
-                    if (result.data && result.data.students && result.data.students.length > 0) {
-                        tbody.innerHTML = result.data.students.map(student => `
-                            <tr>
-                                <td>${student.MASV}</td>
-                                <td>${student.HOTEN}</td>
-                                <td>${new Date(student.NGAYSINH).toLocaleDateString('vi-VN')}</td>
-                                <td>${student.DIACHI || 'N/A'}</td>
-                                <td>${student.TENDN || ''}</td>
-                                <td>
-                                    <button class="edit-btn" 
-                                        data-masv="${student.MASV}"
-                                        data-hoten="${student.HOTEN}"
-                                        data-ngaysinh="${new Date(student.NGAYSINH).toISOString().split('T')[0]}"
-                                        data-diachi="${student.DIACHI || ''}"
-                                        onclick="showEditStudent(this)">
-                                        <span class="btn-icon"></span> Sửa
-                                    </button>
-                                    <button onclick="showAddGrade('${student.MASV}')" class="grade-btn">
-                                        <span class="btn-icon"></span> Nhập điểm
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('');
-                    } else {
-                        console.log('No students data received');
-                        tbody.innerHTML = '<tr><td colspan="6">Không có sinh viên nào trong lớp</td></tr>';
-                    }
-
+                    students.forEach(student => {
+                        if (student.MASV === result.data.MASV) {
+                            student.HOTEN = result.data.HOTEN;
+                            student.NGAYSINH = result.data.NGAYSINH;
+                            student.DIACHI = result.data.DIACHI;
+                            student.TENDN = result.data.TENDN || student.TENDN;
+                        }
+                    });
+                    renderStudents(currentPage);
                     const message = document.createElement('div');
                     message.className = 'success-message';
                     message.textContent = result.message || 'Cập nhật thành công';
@@ -339,6 +316,11 @@
                 setTimeout(() => message.remove(), 3000);
             }
         });
+
+        if (students.length > 0) {
+            renderStudents(currentPage);
+            renderPagination();
+        }
     </script>
 </body>
 </html>

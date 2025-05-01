@@ -12,6 +12,7 @@ const validateGradeInput = (req, res, next) => {
 const addOrUpdateGrade = async (req, res) => {
     const studentId = req.params.id;
     const { mahp, diemthi, malop } = req.body;
+    console.log(req.body);
 
     let connection;
     try {
@@ -34,7 +35,7 @@ const addOrUpdateGrade = async (req, res) => {
         request.input('MAHP', sql.VarChar, mahp);
         request.input('DIEMTHI', sql.Float, diemthi);
         request.input('MANV', sql.VarChar, req.session.user.MANV);
-
+        console.log(request);
         await request.execute('SP_INS_UPD_BANGDIEM');
 
         res.json({
@@ -113,7 +114,7 @@ const getClassGrades = async (req, res) => {
     const { id: classId } = req.params;
     const password = req.method === 'POST' ? req.body.password : null;
 
-    // Simplified session check - only MANV is required
+    // Kiểm tra phiên đăng nhập
     if (!req.session.user || !req.session.user.MANV) {
         console.log('Session user missing or MANV undefined:', req.session.user);
         return res.render('class-grades', {
@@ -129,53 +130,60 @@ const getClassGrades = async (req, res) => {
     try {
         const pool = await sql.connect();
 
-        let studentsArray = [];
-        let subjects = [];
-
-        // Lấy học phần từ SP_SEL_HOCPHAN (always fetch subjects)
+        // Lấy học phần từ SP_SEL_HOCPHAN
         const subjectRequest = pool.request();
         subjectRequest.input('MANV', sql.VarChar, req.session.user.MANV);
         const subjectResult = await subjectRequest.execute('SP_SEL_HOCPHAN');
-        subjects = subjectResult.recordset;
+        const subjects = subjectResult.recordset;
 
+        // Lấy danh sách sinh viên từ SINHVIEN
+        const studentRequest = pool.request();
+        studentRequest.input('MALOP', sql.VarChar, classId);
+        const studentResult = await studentRequest.query(`
+            SELECT MASV, HOTEN
+            FROM SINHVIEN
+            WHERE MALOP = @MALOP
+            ORDER BY MASV
+        `);
+        let studentsArray = studentResult.recordset.map(student => ({
+            MASV: student.MASV,
+            HOTEN: student.HOTEN,
+            grades: {}
+        }));
+
+        // Xử lý điểm nếu có mật khẩu
         if (password) {
-            // Lấy điểm lớp từ SP_SEL_DIEMLOP
             const gradeRequest = pool.request();
             gradeRequest.input('MALOP', sql.VarChar, classId);
             gradeRequest.input('MANV', sql.VarChar, req.session.user.MANV);
             gradeRequest.input('MK', sql.NVarChar, password);
             const gradeResult = await gradeRequest.execute('SP_SEL_DIEMLOP');
 
-            if (!gradeResult.recordset || gradeResult.recordset.length === 0) {
-                return res.render('class-grades', {
-                    students: [],
-                    subjects,
-                    classId,
-                    staffName: req.session.user.HOTEN || 'Unknown',
-                    error: 'Không có điểm nào trong lớp này hoặc mật khẩu không đúng',
-                    BASE_URL: res.locals.BASE_URL
-                });
-            }
+            if (gradeResult.recordset && gradeResult.recordset.length > 0) {
+                console.log('Grades route - Session user:', req.session.user);
+                console.log('Raw grades data:', gradeResult.recordset);
 
-            console.log('Grades route - Session user:', req.session.user);
-            console.log('Raw grades data:', gradeResult.recordset);
-
-            // Xử lý dữ liệu điểm
-            const students = {};
-            gradeResult.recordset.forEach(grade => {
-                if (!students[grade.MASV]) {
-                    students[grade.MASV] = {
-                        MASV: grade.MASV,
-                        HOTEN: grade.HOTEN,
+                // Xử lý dữ liệu điểm
+                const students = {};
+                studentsArray.forEach(student => {
+                    students[student.MASV] = {
+                        MASV: student.MASV,
+                        HOTEN: student.HOTEN,
                         grades: {}
                     };
-                }
-                if (grade.MAHP && grade.DIEMTHI !== null) {
-                    students[grade.MASV].grades[grade.MAHP] = grade.DIEMTHI;
-                }
-            });
+                });
 
-            studentsArray = Object.values(students);
+                gradeResult.recordset.forEach(grade => {
+                    if (students[grade.MASV] && grade.MAHP && grade.DIEMTHI !== null) {
+                        students[grade.MASV].grades[grade.MAHP] = grade.DIEMTHI;
+                    }
+                });
+
+                studentsArray = Object.values(students);
+            } else {
+                // Nếu không có điểm, giữ danh sách sinh viên với grades rỗng
+                console.log('No grades found or incorrect password for class:', classId);
+            }
         }
 
         res.render('class-grades', {
@@ -183,7 +191,7 @@ const getClassGrades = async (req, res) => {
             subjects,
             classId,
             staffName: req.session.user.HOTEN || 'Unknown',
-            error: password && studentsArray.length === 0 ? 'Mật khẩu không đúng hoặc không có dữ liệu' : null,
+            error: password && (!gradeResult || gradeResult.recordset.length === 0) ? 'Mật khẩu không đúng hoặc không có dữ liệu điểm' : null,
             BASE_URL: res.locals.BASE_URL
         });
     } catch (err) {
@@ -197,14 +205,41 @@ const getClassGrades = async (req, res) => {
             errorMessage = 'Nhân viên không tồn tại';
         }
 
-        res.render('class-grades', {
-            students: [],
-            subjects: [],
-            classId,
-            staffName: req.session.user.HOTEN || 'Unknown',
-            error: errorMessage,
-            BASE_URL: res.locals.BASE_URL
-        });
+        // Vẫn cố gắng lấy danh sách sinh viên nếu có lỗi
+        try {
+            const studentRequest = pool.request();
+            studentRequest.input('MALOP', sql.VarChar, classId);
+            const studentResult = await studentRequest.query(`
+                SELECT MASV, HOTEN
+                FROM SINHVIEN
+                WHERE MALOP = @MALOP
+                ORDER BY MASV
+            `);
+            const studentsArray = studentResult.recordset.map(student => ({
+                MASV: student.MASV,
+                HOTEN: student.HOTEN,
+                grades: {}
+            }));
+
+            res.render('class-grades', {
+                students: studentsArray,
+                subjects: [],
+                classId,
+                staffName: req.session.user.HOTEN || 'Unknown',
+                error: errorMessage,
+                BASE_URL: res.locals.BASE_URL
+            });
+        } catch (fallbackErr) {
+            console.error('Error fetching students fallback:', fallbackErr);
+            res.render('class-grades', {
+                students: [],
+                subjects: [],
+                classId,
+                staffName: req.session.user.HOTEN || 'Unknown',
+                error: 'Không thể lấy danh sách sinh viên: ' + errorMessage,
+                BASE_URL: res.locals.BASE_URL
+            });
+        }
     }
 };
 
