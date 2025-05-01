@@ -33,6 +33,15 @@ const listClasses = async (req, res) => {
             BASE_URL: res.locals.BASE_URL || 'http://localhost:3001',
             error: 'Không thể lấy danh sách lớp'
         });
+    } finally {
+        if (connection) {
+            try {
+                connection.release(); // Release the connection back to the pool
+                console.log('Database connection released back to pool');
+            } catch (releaseErr) {
+                console.error('Error releasing connection:', releaseErr);
+            }
+        }
     }
 };
 const getClassDetails = async (req, res) => {
@@ -42,21 +51,23 @@ const getClassDetails = async (req, res) => {
         
         // Get connection from pool
         connection = await getConnection();
+        console.log('Database connection established for class details');
         
         // Get students in the class using stored procedure
         const request = connection.request();
         request.input('MALOP', sql.VarChar, classId);
         const result = await request.execute('SP_SEL_SINHVIEN_BY_LOP');
+        console.log('Students fetched successfully');
 
         // Get list of subjects for grade input
         const subjectsRequest = connection.request();
-        const subjectsResult = await subjectsRequest.query`
-            SELECT * FROM HOCPHAN
-        `;
+        subjectsRequest.input('MANV', sql.VarChar, req.session.user.MANV);
+        const subjectsResult = await subjectsRequest.execute('SP_SEL_HOCPHAN');
+        console.log('Subjects fetched successfully');
         
         res.render('class-details', {
-            students: result.recordset,
-            subjects: subjectsResult.recordset,
+            students: result.recordset || [],
+            subjects: subjectsResult.recordset || [],
             classId: classId,
             staffName: req.session.user.HOTEN,
             error: null,
@@ -64,14 +75,31 @@ const getClassDetails = async (req, res) => {
         });
     } catch (err) {
         console.error('Error fetching class details:', err);
+        let errorMessage = 'Không thể lấy thông tin lớp';
+        
+        if (err.message.includes('quyền quản lý')) {
+            errorMessage = 'Bạn không có quyền xem thông tin lớp này';
+        } else if (err.message.includes('Nhân viên không tồn tại')) {
+            errorMessage = 'Nhân viên không tồn tại';
+        }
+
         res.render('class-details', {
-            error: 'Không thể lấy thông tin lớp',
+            error: errorMessage,
             students: [],
             subjects: [],
             classId: req.params.id,
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL
         });
+    } finally {
+        if (connection) {
+            try {
+                connection.release(); // Release the connection back to the pool
+                console.log('Database connection released back to pool');
+            } catch (releaseErr) {
+                console.error('Error releasing connection:', releaseErr);
+            }
+        }
     }
 };
 

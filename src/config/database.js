@@ -91,6 +91,7 @@ async function getConnection() {
 
 module.exports = {
     sql,
+    config,
     connectDB,
     getConnection
 };

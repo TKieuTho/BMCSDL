@@ -1,4 +1,4 @@
-const { sql } = require('../config/database');
+const { sql, config } = require('../config/database');
 
 // Middleware để validate đầu vào
 const validateGradeInput = (req, res, next) => {
@@ -12,31 +12,29 @@ const validateGradeInput = (req, res, next) => {
 const addOrUpdateGrade = async (req, res) => {
     const studentId = req.params.id;
     const { mahp, diemthi, malop } = req.body;
-    console.log(req.body);
+    console.log('Request body:', req.body);
 
     let connection;
     try {
-        // Tạo kết nối mới
-        connection = await sql.connect({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            server: process.env.DB_SERVER,
-            database: 'QLSVNhom',
-            port: 1433,
-            options: {
-                encrypt: true,
-                trustServerCertificate: true,
-                enableArithAbort: true
-            }
-        });
+        // Create new connection using the exported config
+        connection = await sql.connect(config);
+        console.log('Database connection established');
 
         const request = connection.request();
         request.input('MASV', sql.VarChar, studentId);
         request.input('MAHP', sql.VarChar, mahp);
         request.input('DIEMTHI', sql.Float, diemthi);
         request.input('MANV', sql.VarChar, req.session.user.MANV);
-        console.log(request);
-        await request.execute('SP_INS_UPD_BANGDIEM');
+        
+        console.log('Executing stored procedure with params:', {
+            MASV: studentId,
+            MAHP: mahp,
+            DIEMTHI: diemthi,
+            MANV: req.session.user.MANV
+        });
+
+        const result = await request.execute('SP_INS_UPD_BANGDIEM');
+        console.log('Stored procedure executed successfully');
 
         res.json({
             success: true,
@@ -54,8 +52,12 @@ const addOrUpdateGrade = async (req, res) => {
         res.status(500).json({ success: false, error: errorMessage });
     } finally {
         if (connection) {
-            await connection.close();
-            console.log('Database connection closed');
+            try {
+                connection.release(); // Release the connection back to the pool
+                console.log('Database connection released back to pool');
+            } catch (releaseErr) {
+                console.error('Error releasing connection:', releaseErr);
+            }
         }
     }
 };
@@ -128,18 +130,9 @@ const getClassGrades = async (req, res) => {
 
     let connection;
     try {
-        connection = await sql.connect({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            server: process.env.DB_SERVER,
-            database: 'QLSVNhom',
-            port: 1433,
-            options: {
-                encrypt: true,
-                trustServerCertificate: true,
-                enableArithAbort: true
-            }
-        });
+        // Get connection from pool
+        connection = await sql.connect(config);
+        console.log('Database connection established');
 
         // Lấy học phần từ SP_SEL_HOCPHAN
         const subjectRequest = connection.request();
@@ -150,50 +143,41 @@ const getClassGrades = async (req, res) => {
         // Lấy danh sách sinh viên từ SINHVIEN
         const studentRequest = connection.request();
         studentRequest.input('MALOP', sql.VarChar, classId);
-        const studentResult = await studentRequest.query(`
-            SELECT MASV, HOTEN
-            FROM SINHVIEN
-            WHERE MALOP = @MALOP
-            ORDER BY MASV
-        `);
+        const studentResult = await studentRequest.execute('SP_SEL_SINHVIEN_BY_LOP');
         let studentsArray = studentResult.recordset.map(student => ({
             MASV: student.MASV,
             HOTEN: student.HOTEN,
             grades: {}
         }));
 
-        try {
-            // Lấy điểm của lớp
-            const gradeRequest = connection.request();
-            gradeRequest.input('MALOP', sql.VarChar, classId);
-            gradeRequest.input('MANV', sql.VarChar, req.session.user.MANV);
-            const gradeResult = await gradeRequest.execute('SP_SEL_DIEMLOP');
+        // Lấy điểm của lớp
+        const gradeRequest = connection.request();
+        gradeRequest.input('MALOP', sql.VarChar, classId);
+        gradeRequest.input('MANV', sql.VarChar, req.session.user.MANV);
+        gradeRequest.input('MK', sql.NVarChar, req.session.user.password); // Add password for decryption
+        const gradeResult = await gradeRequest.execute('SP_SEL_DIEMLOP');
 
-            if (gradeResult.recordset && gradeResult.recordset.length > 0) {
-                console.log('Grades route - Session user:', req.session.user);
-                console.log('Raw grades data:', gradeResult.recordset);
+        if (gradeResult.recordset && gradeResult.recordset.length > 0) {
+            console.log('Grades route - Session user:', req.session.user);
+            console.log('Raw grades data:', gradeResult.recordset);
 
-                // Xử lý dữ liệu điểm
-                const students = {};
-                studentsArray.forEach(student => {
-                    students[student.MASV] = {
-                        MASV: student.MASV,
-                        HOTEN: student.HOTEN,
-                        grades: {}
-                    };
-                });
+            // Xử lý dữ liệu điểm
+            const students = {};
+            studentsArray.forEach(student => {
+                students[student.MASV] = {
+                    MASV: student.MASV,
+                    HOTEN: student.HOTEN,
+                    grades: {}
+                };
+            });
 
-                gradeResult.recordset.forEach(grade => {
-                    if (students[grade.MASV] && grade.MAHP && grade.DIEMTHI !== null) {
-                        students[grade.MASV].grades[grade.MAHP] = grade.DIEMTHI;
-                    }
-                });
+            gradeResult.recordset.forEach(grade => {
+                if (students[grade.MASV] && grade.MAHP && grade.DIEMTHI !== null) {
+                    students[grade.MASV].grades[grade.MAHP] = grade.DIEMTHI;
+                }
+            });
 
-                studentsArray = Object.values(students);
-            }
-        } catch (gradeErr) {
-            console.log('No grades found for class:', classId);
-            // Continue with empty grades
+            studentsArray = Object.values(students);
         }
 
         res.render('class-grades', {
@@ -211,42 +195,26 @@ const getClassGrades = async (req, res) => {
             errorMessage = 'Bạn không có quyền xem điểm lớp này';
         } else if (err.message.includes('Nhân viên không tồn tại')) {
             errorMessage = 'Nhân viên không tồn tại';
+        } else if (err.message.includes('Mật khẩu không chính xác')) {
+            errorMessage = 'Mật khẩu không chính xác';
         }
 
-        // Vẫn cố gắng lấy danh sách sinh viên nếu có lỗi
-        try {
-            const studentRequest = connection.request();
-            studentRequest.input('MALOP', sql.VarChar, classId);
-            const studentResult = await studentRequest.query(`
-                SELECT MASV, HOTEN
-                FROM SINHVIEN
-                WHERE MALOP = @MALOP
-                ORDER BY MASV
-            `);
-            const studentsArray = studentResult.recordset.map(student => ({
-                MASV: student.MASV,
-                HOTEN: student.HOTEN,
-                grades: {}
-            }));
-
-            res.render('class-grades', {
-                students: studentsArray,
-                subjects: [],
-                classId,
-                staffName: req.session.user.HOTEN || 'Unknown',
-                error: errorMessage,
-                BASE_URL: res.locals.BASE_URL
-            });
-        } catch (fallbackErr) {
-            console.error('Error fetching students fallback:', fallbackErr);
-            res.render('class-grades', {
-                students: [],
-                subjects: [],
-                classId,
-                staffName: req.session.user.HOTEN || 'Unknown',
-                error: 'Không thể lấy danh sách sinh viên: ' + errorMessage,
-                BASE_URL: res.locals.BASE_URL
-            });
+        res.render('class-grades', {
+            students: [],
+            subjects: [],
+            classId,
+            staffName: req.session.user.HOTEN || 'Unknown',
+            error: errorMessage,
+            BASE_URL: res.locals.BASE_URL
+        });
+    } finally {
+        if (connection) {
+            try {
+                connection.release(); // Release the connection back to the pool
+                console.log('Database connection released back to pool');
+            } catch (releaseErr) {
+                console.error('Error releasing connection:', releaseErr);
+            }
         }
     }
 };
