@@ -35,6 +35,17 @@
             color: #ccc;
             cursor: not-allowed;
         }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        .search-container input {
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -68,6 +79,9 @@
             <% if (students.length === 0) { %>
                 <p class="no-data">Chưa có sinh viên trong lớp</p>
             <% } else { %>
+                <div class="search-container">
+                    <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -147,7 +161,6 @@
                         <label for="edit_diachi">Địa chỉ:</label>
                         <input type="text" id="edit_diachi" name="diachi">
                     </div>
-                    yür
                     <div class="form-actions">
                         <button type="submit" class="submit-btn">
                             <span class="btn-icon"></span> Cập nhật
@@ -165,14 +178,29 @@
         const students = <%- JSON.stringify(students) %>;
         const itemsPerPage = 7;
         let currentPage = 1;
-        const totalPages = Math.ceil(students.length / itemsPerPage);
+        let filteredStudents = [...students];
+        let totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+
+        function filterStudents() {
+            const searchValue = document.getElementById('search').value.trim().toLowerCase();
+            
+            filteredStudents = students.filter(student => 
+                student.MASV.toLowerCase().includes(searchValue) ||
+                student.HOTEN.toLowerCase().includes(searchValue)
+            );
+            
+            totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+            currentPage = 1;
+            renderStudents(currentPage);
+            renderPagination();
+        }
 
         function renderStudents(page) {
             const tbody = document.getElementById('students-tbody');
             tbody.innerHTML = '';
             const start = (page - 1) * itemsPerPage;
             const end = start + itemsPerPage;
-            students.slice(start, end).forEach(student => {
+            filteredStudents.slice(start, end).forEach(student => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${student.MASV}</td>
@@ -298,7 +326,7 @@
                             student.TENDN = result.data.TENDN || student.TENDN;
                         }
                     });
-                    renderStudents(currentPage);
+                    filterStudents();
                     const message = document.createElement('div');
                     message.className = 'success-message';
                     message.textContent = result.message || 'Cập nhật thành công';
@@ -318,6 +346,7 @@
         });
 
         if (students.length > 0) {
+            document.getElementById('search').addEventListener('input', filterStudents);
             renderStudents(currentPage);
             renderPagination();
         }

@@ -67,6 +67,17 @@
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        .search-container input {
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -94,6 +105,9 @@
             </form>
         <% } else { %>
             <div class="grades-container">
+                <div class="search-container">
+                    <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
+                </div>
                 <div class="subject-filter">
                     <label for="subject-select">Chọn môn học:</label>
                     <select id="subject-select">
@@ -130,13 +144,28 @@
         const itemsPerPage = 7;
         let currentPage = 1;
         let selectedSubject = subjects[0]?.MAHP || '';
-        let totalPages = Math.ceil(students.length / itemsPerPage);
+        let filteredStudents = [...students];
+        let totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+
+        function filterStudents() {
+            const searchValue = document.getElementById('search').value.trim().toLowerCase();
+            
+            filteredStudents = students.filter(student => 
+                student.MASV.toLowerCase().includes(searchValue) ||
+                student.HOTEN.toLowerCase().includes(searchValue)
+            );
+            
+            totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+            currentPage = 1;
+            renderStudents(currentPage);
+            renderPagination();
+        }
 
         function renderStudents(page) {
             const tbody = document.getElementById('grades-tbody');
             tbody.innerHTML = '';
             if (!selectedSubject) {
-                students.forEach(student => {
+                filteredStudents.forEach(student => {
                     const row = document.createElement('tr');
                     row.dataset.masv = student.MASV;
                     row.dataset.malop = '<%= classId %>';
@@ -152,7 +181,7 @@
             }
             const start = (page - 1) * itemsPerPage;
             const end = start + itemsPerPage;
-            students.slice(start, end).forEach(student => {
+            filteredStudents.slice(start, end).forEach(student => {
                 const row = document.createElement('tr');
                 row.dataset.masv = student.MASV;
                 row.dataset.malop = '<%= classId %>';
@@ -309,13 +338,14 @@
                     }
                 });
             });
+
+            document.getElementById('search').addEventListener('input', filterStudents);
         }
 
         document.getElementById('subject-select')?.addEventListener('change', (e) => {
             selectedSubject = e.target.value;
             currentPage = 1;
-            renderStudents(currentPage);
-            renderPagination();
+            filterStudents();
         });
 
         console.log('Subjects data:', subjects);
