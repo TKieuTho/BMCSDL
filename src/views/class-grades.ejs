@@ -7,14 +7,25 @@
     <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
     <style>
         .edit-grade-btn, .update-grade-btn, .cancel-grade-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--border-radius);
             cursor: pointer;
-            color: #3498db;
             font-size: 14px;
-            margin: 0 5px;
-            text-decoration: underline;
-        }
+            font-weight: 500;
+            text-decoration: none;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #65c0d5;
+         }
+
         .edit-grade-btn:hover, .update-grade-btn:hover, .cancel-grade-btn:hover {
-            color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);   
         }
         .grade-input {
             width: 60px;
@@ -170,9 +181,9 @@
                         <span class="grade-value" style="color: ${color}" data-mahp="${selectedSubject}">${gradeText}</span>
                     </td>
                     <td>
-                        <span class="edit-grade-btn">[Sửa]</span>
-                        <span class="update-grade-btn" style="display: none;">[Lưu]</span>
-                        <span class="cancel-grade-btn" style="display: none;">[Hủy]</span>
+                        <span class="edit-grade-btn">Sửa</span>
+                        <span class="update-grade-btn" style="display: none;">Lưu</span>
+                        <span class="cancel-grade-btn" style="display: none;">Hủy</span>
                     </td>
                 `;
                 tbody.appendChild(row);
