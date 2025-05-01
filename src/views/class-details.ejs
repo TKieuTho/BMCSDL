@@ -22,7 +22,7 @@
             font-size: 14px;
         }
         .pagination button:hover {
-            background-color: #3498db;
+            background-color: #3498dba8;
             color: #fff;
         }
         .pagination button.active {
@@ -175,7 +175,7 @@
     </div>
 
     <script>
-        const students = <%- JSON.stringify(students) %>;
+        let students = <%- JSON.stringify(students) %>;
         const itemsPerPage = 7;
         let currentPage = 1;
         let filteredStudents = [...students];
@@ -226,6 +226,7 @@
         function renderPagination() {
             const pagination = document.getElementById('pagination');
             pagination.innerHTML = '';
+            const totalPages = Math.ceil(students.length / itemsPerPage);
 
             const prevButton = document.createElement('button');
             prevButton.textContent = 'Trước';
@@ -278,7 +279,6 @@
             document.getElementById('edit_hoten').value = button.dataset.hoten;
             document.getElementById('edit_ngaysinh').value = button.dataset.ngaysinh;
             document.getElementById('edit_diachi').value = button.dataset.diachi;
-            console.log('MASV set to:', button.dataset.masv);
             form.style.display = 'block';
         }
 
@@ -287,10 +287,17 @@
         }
 
         function confirmLogout() {
-            console.log('Logout clicked by user:', '<%= staffName %>');
             if (confirm('Bạn có chắc muốn đăng xuất?')) {
                 window.location.href = '<%= BASE_URL %>/auth/logout';
             }
+        }
+
+        function showMessage(message, type = 'success') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `${type}-message`;
+            msgDiv.textContent = message;
+            document.querySelector('.container').insertBefore(msgDiv, document.querySelector('.students-table'));
+            setTimeout(() => msgDiv.remove(), 3000);
         }
 
         window.onclick = function(event) {
@@ -337,14 +344,9 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                const message = document.createElement('div');
-                message.className = 'error-message';
-                message.textContent = error.message || 'Không thể cập nhật thông tin sinh viên';
-                document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
-                setTimeout(() => message.remove(), 3000);
+                showMessage(error.message || 'Không thể cập nhật thông tin sinh viên', 'error');
             }
         });
-
         if (students.length > 0) {
             document.getElementById('search').addEventListener('input', filterStudents);
             renderStudents(currentPage);
