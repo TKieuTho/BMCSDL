@@ -22,7 +22,7 @@
             font-size: 14px;
         }
         .pagination button:hover {
-            background-color: #3498db;
+            background-color: #3498dba8;
             color: #fff;
         }
         .pagination button.active {
@@ -34,6 +34,20 @@
             border-color: #ccc;
             color: #ccc;
             cursor: not-allowed;
+        }
+        .success-message, .error-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -147,7 +161,6 @@
                         <label for="edit_diachi">Địa chỉ:</label>
                         <input type="text" id="edit_diachi" name="diachi">
                     </div>
-                    yür
                     <div class="form-actions">
                         <button type="submit" class="submit-btn">
                             <span class="btn-icon"></span> Cập nhật
@@ -162,10 +175,9 @@
     </div>
 
     <script>
-        const students = <%- JSON.stringify(students) %>;
+        let students = <%- JSON.stringify(students) %>;
         const itemsPerPage = 7;
         let currentPage = 1;
-        const totalPages = Math.ceil(students.length / itemsPerPage);
 
         function renderStudents(page) {
             const tbody = document.getElementById('students-tbody');
@@ -198,6 +210,7 @@
         function renderPagination() {
             const pagination = document.getElementById('pagination');
             pagination.innerHTML = '';
+            const totalPages = Math.ceil(students.length / itemsPerPage);
 
             const prevButton = document.createElement('button');
             prevButton.textContent = 'Trước';
@@ -250,7 +263,6 @@
             document.getElementById('edit_hoten').value = button.dataset.hoten;
             document.getElementById('edit_ngaysinh').value = button.dataset.ngaysinh;
             document.getElementById('edit_diachi').value = button.dataset.diachi;
-            console.log('MASV set to:', button.dataset.masv);
             form.style.display = 'block';
         }
 
@@ -259,10 +271,17 @@
         }
 
         function confirmLogout() {
-            console.log('Logout clicked by user:', '<%= staffName %>');
             if (confirm('Bạn có chắc muốn đăng xuất?')) {
                 window.location.href = '<%= BASE_URL %>/auth/logout';
             }
+        }
+
+        function showMessage(message, type = 'success') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `${type}-message`;
+            msgDiv.textContent = message;
+            document.querySelector('.container').insertBefore(msgDiv, document.querySelector('.students-table'));
+            setTimeout(() => msgDiv.remove(), 3000);
         }
 
         window.onclick = function(event) {
@@ -287,36 +306,27 @@
                     body: formData
                 });
                 const result = await response.json();
-                console.log('Server response:', result);
-                if (result.success) {
-                    hideEditStudentForm();
-                    students.forEach(student => {
-                        if (student.MASV === result.data.MASV) {
-                            student.HOTEN = result.data.HOTEN;
-                            student.NGAYSINH = result.data.NGAYSINH;
-                            student.DIACHI = result.data.DIACHI;
-                            student.TENDN = result.data.TENDN || student.TENDN;
-                        }
-                    });
+                console.log('Server response:', result); // Debug: Kiểm tra dữ liệu trả về
+
+                if (result.success && result.data && result.data.students) {
+                    // Cập nhật mảng students với danh sách mới từ server
+                    students = result.data.students;
+
+                    console.log('Updated students:', students); // Debug: Kiểm tra mảng students
+
+                    // Làm mới bảng và phân trang
                     renderStudents(currentPage);
-                    const message = document.createElement('div');
-                    message.className = 'success-message';
-                    message.textContent = result.message || 'Cập nhật thành công';
-                    document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
-                    setTimeout(() => message.remove(), 3000);
+                    renderPagination();
+                    hideEditStudentForm();
+                    showMessage('Cập nhật thông tin sinh viên thành công!', 'success');
                 } else {
                     throw new Error(result.error || 'Cập nhật thất bại');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                const message = document.createElement('div');
-                message.className = 'error-message';
-                message.textContent = error.message || 'Không thể cập nhật thông tin sinh viên';
-                document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
-                setTimeout(() => message.remove(), 3000);
+                showMessage(error.message || 'Không thể cập nhật thông tin sinh viên', 'error');
             }
         });
-
         if (students.length > 0) {
             renderStudents(currentPage);
             renderPagination();
