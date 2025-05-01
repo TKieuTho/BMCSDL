@@ -112,7 +112,6 @@ const getStudentGrade = async (req, res) => {
 
 const getClassGrades = async (req, res) => {
     const { id: classId } = req.params;
-    const password = req.method === 'POST' ? req.body.password : null;
 
     // Kiểm tra phiên đăng nhập
     if (!req.session.user || !req.session.user.MANV) {
@@ -127,17 +126,29 @@ const getClassGrades = async (req, res) => {
         });
     }
 
+    let connection;
     try {
-        const pool = await sql.connect();
+        connection = await sql.connect({
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            server: process.env.DB_SERVER,
+            database: 'QLSVNhom',
+            port: 1433,
+            options: {
+                encrypt: true,
+                trustServerCertificate: true,
+                enableArithAbort: true
+            }
+        });
 
         // Lấy học phần từ SP_SEL_HOCPHAN
-        const subjectRequest = pool.request();
+        const subjectRequest = connection.request();
         subjectRequest.input('MANV', sql.VarChar, req.session.user.MANV);
         const subjectResult = await subjectRequest.execute('SP_SEL_HOCPHAN');
         const subjects = subjectResult.recordset;
 
         // Lấy danh sách sinh viên từ SINHVIEN
-        const studentRequest = pool.request();
+        const studentRequest = connection.request();
         studentRequest.input('MALOP', sql.VarChar, classId);
         const studentResult = await studentRequest.query(`
             SELECT MASV, HOTEN
@@ -151,12 +162,11 @@ const getClassGrades = async (req, res) => {
             grades: {}
         }));
 
-        // Xử lý điểm nếu có mật khẩu
-        if (password) {
-            const gradeRequest = pool.request();
+        try {
+            // Lấy điểm của lớp
+            const gradeRequest = connection.request();
             gradeRequest.input('MALOP', sql.VarChar, classId);
             gradeRequest.input('MANV', sql.VarChar, req.session.user.MANV);
-            gradeRequest.input('MK', sql.NVarChar, password);
             const gradeResult = await gradeRequest.execute('SP_SEL_DIEMLOP');
 
             if (gradeResult.recordset && gradeResult.recordset.length > 0) {
@@ -180,10 +190,10 @@ const getClassGrades = async (req, res) => {
                 });
 
                 studentsArray = Object.values(students);
-            } else {
-                // Nếu không có điểm, giữ danh sách sinh viên với grades rỗng
-                console.log('No grades found or incorrect password for class:', classId);
             }
+        } catch (gradeErr) {
+            console.log('No grades found for class:', classId);
+            // Continue with empty grades
         }
 
         res.render('class-grades', {
@@ -191,15 +201,13 @@ const getClassGrades = async (req, res) => {
             subjects,
             classId,
             staffName: req.session.user.HOTEN || 'Unknown',
-            error: password && (!gradeResult || gradeResult.recordset.length === 0) ? 'Mật khẩu không đúng hoặc không có dữ liệu điểm' : null,
+            error: null,
             BASE_URL: res.locals.BASE_URL
         });
     } catch (err) {
         console.error('Error fetching class grades:', err);
         let errorMessage = 'Không thể lấy bảng điểm';
-        if (err.message.includes('Mật khẩu không chính xác')) {
-            errorMessage = 'Mật khẩu không đúng';
-        } else if (err.message.includes('Nhân viên không có quyền quản lý lớp này')) {
+        if (err.message.includes('Nhân viên không có quyền quản lý lớp này')) {
             errorMessage = 'Bạn không có quyền xem điểm lớp này';
         } else if (err.message.includes('Nhân viên không tồn tại')) {
             errorMessage = 'Nhân viên không tồn tại';
@@ -207,7 +215,7 @@ const getClassGrades = async (req, res) => {
 
         // Vẫn cố gắng lấy danh sách sinh viên nếu có lỗi
         try {
-            const studentRequest = pool.request();
+            const studentRequest = connection.request();
             studentRequest.input('MALOP', sql.VarChar, classId);
             const studentResult = await studentRequest.query(`
                 SELECT MASV, HOTEN

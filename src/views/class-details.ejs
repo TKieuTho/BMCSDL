@@ -202,19 +202,15 @@
             const end = start + itemsPerPage;
             filteredStudents.slice(start, end).forEach(student => {
                 const row = document.createElement('tr');
+                row.dataset.masv = student.MASV;
                 row.innerHTML = `
                     <td>${student.MASV}</td>
-                    <td>${student.HOTEN}</td>
-                    <td>${new Date(student.NGAYSINH).toLocaleDateString('vi-VN')}</td>
-                    <td>${student.DIACHI || 'N/A'}</td>
+                    <td class="student-name">${student.HOTEN}</td>
+                    <td class="student-birthdate">${new Date(student.NGAYSINH).toLocaleDateString('vi-VN')}</td>
+                    <td class="student-address">${student.DIACHI || 'N/A'}</td>
                     <td>${student.TENDN}</td>
                     <td>
-                        <button class="edit-btn" 
-                            data-masv="${student.MASV}"
-                            data-hoten="${student.HOTEN}"
-                            data-ngaysinh="${new Date(student.NGAYSINH).toISOString().split('T')[0]}"
-                            data-diachi="${student.DIACHI || ''}"
-                            onclick="showEditStudent(this)">
+                        <button class="edit-btn" onclick="showEditStudent(this)">
                             <span class="btn-icon"></span> Sửa
                         </button>
                     </td>
@@ -274,11 +270,17 @@
         }
 
         function showEditStudent(button) {
+            const row = button.closest('tr');
+            const masv = row.dataset.masv;
+            const hoten = row.querySelector('.student-name').textContent;
+            const ngaysinh = row.querySelector('.student-birthdate').textContent;
+            const diachi = row.querySelector('.student-address').textContent;
+
             const form = document.getElementById('editStudentForm');
-            document.getElementById('edit_masv').value = button.dataset.masv;
-            document.getElementById('edit_hoten').value = button.dataset.hoten;
-            document.getElementById('edit_ngaysinh').value = button.dataset.ngaysinh;
-            document.getElementById('edit_diachi').value = button.dataset.diachi;
+            document.getElementById('edit_masv').value = masv;
+            document.getElementById('edit_hoten').value = hoten;
+            document.getElementById('edit_ngaysinh').value = new Date(ngaysinh).toISOString().split('T')[0];
+            document.getElementById('edit_diachi').value = diachi;
             form.style.display = 'block';
         }
 
@@ -309,44 +311,73 @@
             }
         }
 
-        document.getElementById('editStudentFormContent').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        // Function to update student list
+        function updateStudentList(updatedStudent) {
+            // Update the students array
+            const index = students.findIndex(s => s.MASV === updatedStudent.MASV);
+            if (index !== -1) {
+                students[index] = { ...students[index], ...updatedStudent };
+            }
+
+            // Update the filtered students array
+            const filteredIndex = filteredStudents.findIndex(s => s.MASV === updatedStudent.MASV);
+            if (filteredIndex !== -1) {
+                filteredStudents[filteredIndex] = { ...filteredStudents[filteredIndex], ...updatedStudent };
+            }
+
+            // Re-render the current page
+            renderStudents(currentPage);
+        }
+
+        // Function to handle edit form submission
+        async function handleEditSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
             try {
-                const formData = new URLSearchParams(new FormData(this)).toString();
-                const response = await fetch(this.action, {
+                const response = await fetch(form.action, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: formData
+                    body: new URLSearchParams(data).toString()
                 });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
                 const result = await response.json();
-                console.log('Server response:', result);
+                
                 if (result.success) {
-                    hideEditStudentForm();
-                    students.forEach(student => {
-                        if (student.MASV === result.data.MASV) {
-                            student.HOTEN = result.data.HOTEN;
-                            student.NGAYSINH = result.data.NGAYSINH;
-                            student.DIACHI = result.data.DIACHI;
-                            student.TENDN = result.data.TENDN || student.TENDN;
-                        }
+                    // Update the student list immediately
+                    updateStudentList({
+                        MASV: data.masv,
+                        HOTEN: data.hoten,
+                        NGAYSINH: data.ngaysinh,
+                        DIACHI: data.diachi
                     });
-                    filterStudents();
-                    const message = document.createElement('div');
-                    message.className = 'success-message';
-                    message.textContent = result.message || 'Cập nhật thành công';
-                    document.querySelector('.container').insertBefore(message, document.querySelector('.students-table'));
-                    setTimeout(() => message.remove(), 3000);
+                    
+                    // Hide the edit form
+                    hideEditStudentForm();
+                    
+                    // Show success message
+                    showMessage('Cập nhật thông tin sinh viên thành công!', 'success');
                 } else {
                     throw new Error(result.error || 'Cập nhật thất bại');
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error updating student:', error);
                 showMessage(error.message || 'Không thể cập nhật thông tin sinh viên', 'error');
             }
-        });
+        }
+
+        // Add event listener to edit form
+        document.getElementById('editStudentFormContent').addEventListener('submit', handleEditSubmit);
+
         if (students.length > 0) {
             document.getElementById('search').addEventListener('input', filterStudents);
             renderStudents(currentPage);

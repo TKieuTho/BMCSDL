@@ -6,7 +6,7 @@
     <title>Bảng điểm Lớp <%= classId %> - Hệ thống Quản lý Sinh viên</title>
     <link rel="stylesheet" href="<%= BASE_URL %>/css/style.css">
     <style>
-        .edit-grade-btn, .update-grade-btn, .cancel-grade-btn {
+ .edit-grade-btn, .update-grade-btn, .cancel-grade-btn {
             padding: 10px 20px;
             border: none;
             border-radius: var(--border-radius);
@@ -108,45 +108,37 @@
             <div class="error-message"><%= error %></div>
         <% } %>
 
-        <% if (!students || students.length === 0) { %>
-            <form action="<%= BASE_URL %>/class/<%= classId %>/grades" method="POST">
-                <label for="password">Nhập mật khẩu để xem bảng điểm:</label>
-                <input type="password" id="password" name="password" required>
-                <button type="submit" class="btn">Xác thực</button>
-            </form>
-        <% } else { %>
-            <div class="grades-container">
-                <div class="search-container">
-                    <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
-                </div>
-                <div class="subject-filter">
-                    <label for="subject-select">Chọn môn học:</label>
-                    <select id="subject-select">
-                        <% subjects.forEach(subject => { %>
-                            <% if (subject.MAHP) { %>
-                                <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
-                            <% } %>
-                        <% }); %>
-                    </select>
-                </div>
-                <div class="grades-table">
-                    <table>
-                        <thead id="grades-thead">
-                            <tr>
-                                <th>Mã SV</th>
-                                <th>Họ tên</th>
-                                <th>Điểm</th>
-                                <th>Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody id="grades-tbody">
-                            <!-- Sinh viên sẽ được render bằng JavaScript -->
-                        </tbody>
-                    </table>
-                    <div class="pagination" id="pagination"></div>
-                </div>
+        <div class="grades-container">
+            <div class="search-container">
+                <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
             </div>
-        <% } %>
+            <div class="subject-filter">
+                <label for="subject-select">Chọn môn học:</label>
+                <select id="subject-select">
+                    <% subjects.forEach(subject => { %>
+                        <% if (subject.MAHP) { %>
+                            <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
+                        <% } %>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="grades-table">
+                <table>
+                    <thead id="grades-thead">
+                        <tr>
+                            <th>Mã SV</th>
+                            <th>Họ tên</th>
+                            <th>Điểm</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grades-tbody">
+                        <!-- Sinh viên sẽ được render bằng JavaScript -->
+                    </tbody>
+                </table>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -210,9 +202,9 @@
                         <span class="grade-value" style="color: ${color}" data-mahp="${selectedSubject}">${gradeText}</span>
                     </td>
                     <td>
-                        <span class="edit-grade-btn">Sửa</span>
-                        <span class="update-grade-btn" style="display: none;">Lưu</span>
-                        <span class="cancel-grade-btn" style="display: none;">Hủy</span>
+                        <span class="edit-grade-btn">[Sửa]</span>
+                        <span class="update-grade-btn" style="display: none;">[Lưu]</span>
+                        <span class="cancel-grade-btn" style="display: none;">[Hủy]</span>
                     </td>
                 `;
                 tbody.appendChild(row);

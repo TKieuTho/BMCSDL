@@ -1,4 +1,4 @@
-const { sql } = require('../config/database');
+const { sql, getConnection } = require('../config/database');
 const transporter = require('../config/email');
 const retry = require('async-retry');
 
@@ -13,9 +13,10 @@ const login = async (req, res) => {
     const { manv, password } = req.body;
     console.log('Login attempt:', { manv });
 
+    let connection;
     try {
-        const pool = await sql.connect();
-        const request = pool.request();
+        connection = await getConnection();
+        const request = connection.request();
         request.input('MANV', sql.VarChar, manv);
         request.input('MATKHAU', sql.NVarChar, password);
 
@@ -27,7 +28,8 @@ const login = async (req, res) => {
             const user = result.recordset[0];
             req.session.user = {
                 MANV: user.MANV,
-                HOTEN: user.HOTEN
+                HOTEN: user.HOTEN,
+                password: password // Store password for later use
             };
             console.log('Session user set:', req.session.user);
             req.session.save((err) => {

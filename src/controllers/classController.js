@@ -1,4 +1,4 @@
-const { sql } = require('../config/database');
+const { sql, getConnection } = require('../config/database');
 
 const listClasses = async (req, res) => {
     if (!req.session.user || !req.session.user.MANV) {
@@ -6,9 +6,10 @@ const listClasses = async (req, res) => {
         return res.redirect('/auth/login');
     }
 
+    let connection;
     try {
-        const pool = await sql.connect();
-        const request = pool.request();
+        connection = await getConnection();
+        const request = connection.request();
         request.input('MANV', sql.VarChar, req.session.user.MANV);
 
         console.log('MANV from session:', req.session.user.MANV);
@@ -21,7 +22,7 @@ const listClasses = async (req, res) => {
         res.render('classes', {
             classes: result.recordset || [],
             staffName: req.session.user.HOTEN,
-            BASE_URL: process.env.BASE_URL || 'http://localhost:3001',
+            BASE_URL: res.locals.BASE_URL || 'http://localhost:3001',
             error: null
         });
     } catch (err) {
@@ -29,23 +30,26 @@ const listClasses = async (req, res) => {
         res.render('classes', {
             classes: [],
             staffName: req.session.user.HOTEN || 'Unknown',
-            BASE_URL: process.env.BASE_URL || 'http://localhost:3001',
+            BASE_URL: res.locals.BASE_URL || 'http://localhost:3001',
             error: 'Không thể lấy danh sách lớp'
         });
     }
 };
 const getClassDetails = async (req, res) => {
+    let connection;
     try {
         const classId = req.params.id;
-        const pool = await sql.connect();
+        
+        // Get connection from pool
+        connection = await getConnection();
         
         // Get students in the class using stored procedure
-        const request = pool.request();
+        const request = connection.request();
         request.input('MALOP', sql.VarChar, classId);
         const result = await request.execute('SP_SEL_SINHVIEN_BY_LOP');
 
         // Get list of subjects for grade input
-        const subjectsRequest = pool.request();
+        const subjectsRequest = connection.request();
         const subjectsResult = await subjectsRequest.query`
             SELECT * FROM HOCPHAN
         `;
@@ -55,7 +59,8 @@ const getClassDetails = async (req, res) => {
             subjects: subjectsResult.recordset,
             classId: classId,
             staffName: req.session.user.HOTEN,
-            error: null
+            error: null,
+            BASE_URL: res.locals.BASE_URL
         });
     } catch (err) {
         console.error('Error fetching class details:', err);
@@ -63,8 +68,9 @@ const getClassDetails = async (req, res) => {
             error: 'Không thể lấy thông tin lớp',
             students: [],
             subjects: [],
-            classId: null,
-            staffName: req.session.user.HOTEN
+            classId: req.params.id,
+            staffName: req.session.user.HOTEN,
+            BASE_URL: res.locals.BASE_URL
         });
     }
 };
@@ -162,19 +168,8 @@ const updateStudent = async (req, res) => {
             manv: req.session.user?.MANV
         });
 
-        // Tạo kết nối mới
-        connection = await sql.connect({
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            server: process.env.DB_SERVER,
-            database: 'QLSVNhom',
-            port: 1433,
-            options: {
-                encrypt: true,
-                trustServerCertificate: true,
-                enableArithAbort: true
-            }
-        });
+        // Get connection from pool
+        connection = await getConnection();
 
         const request = connection.request();
         request.input('MASV', sql.NVarChar, masv);
@@ -241,11 +236,6 @@ const updateStudent = async (req, res) => {
             staffName: req.session.user?.HOTEN || 'Unknown',
             BASE_URL: res.locals.BASE_URL
         });
-    } finally {
-        if (connection) {
-            await connection.close();
-            console.log('Database connection closed');
-        }
     }
 };
 
