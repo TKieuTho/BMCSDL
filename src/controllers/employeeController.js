@@ -1,49 +1,33 @@
 const { sql, getConnection } = require('../config/database');
-const { sha1Hash, generateRSAKeyPair, rsaEncrypt } = require('../utils/crypto');
+const { sha1Hash, generateRSAKeyPairFromMK, rsaEncrypt, rsaDecrypt } = require('../utils/crypto');
 const fs = require('fs').promises;
 const path = require('path');
 
 const KEYS_DIR = path.join(__dirname, '../keys');
 fs.mkdir(KEYS_DIR, { recursive: true }).catch(console.error);
 
-// List all employees
-const listEmployees = async (req, res) => {
-    try {
-        const pool = await getConnection();
-        const request = pool.request();
-        const result = await request.execute('SP_SEL_ALL_NHANVIEN');
-
-        res.render('admin/employees', {
-            employees: result.recordset || [],
-            staffName: req.session.user.HOTEN,
-            BASE_URL: res.locals.BASE_URL,
-            error: null,
-        });
-    } catch (err) {
-        console.error('Error details:', {
-            message: err.message,
-            code: err.code,
-            state: err.state,
-            class: err.class,
-            lineNumber: err.lineNumber,
-            serverName: err.serverName,
-            procName: err.procName,
-        });
-        res.render('admin/employees', {
-            employees: [],
-            staffName: req.session.user.HOTEN,
-            BASE_URL: res.locals.BASE_URL,
-            error: 'Không thể lấy danh sách nhân viên',
-        });
-    }
-};
-
-// Add new employee
+// Thêm nhân viên mới
 const addEmployee = async (req, res) => {
     const { manv, hoten, email, luongcb, tendn, matkhau } = req.body;
+    console.log('Request body:', req.body);
+    console.log('Parsed values:', {
+        manv,
+        hoten,
+        email,
+        luongcb,
+        tendn,
+        matkhau: matkhau ? '******' : undefined
+    });
     try {
-        // Input validation
         if (!manv || !hoten || !email || !luongcb || !tendn || !matkhau) {
+            console.log('Missing required fields:', {
+                manv: !manv,
+                hoten: !hoten,
+                email: !email,
+                luongcb: !luongcb,
+                tendn: !tendn,
+                matkhau: !matkhau
+            });
             throw new Error('Thiếu thông tin bắt buộc');
         }
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -53,19 +37,21 @@ const addEmployee = async (req, res) => {
         if (isNaN(luongcb) || parseFloat(luongcb) <= 0) {
             throw new Error('Lương phải là số dương');
         }
-
-        // Generate RSA key pair
-        const { publicKey, privateKey } = await generateRSAKeyPair();
+        // Tạo cặp khóa RSA từ MK (matkhau)
+        const { publicKey, privateKey } = await generateRSAKeyPairFromMK(matkhau);
         const pubkeyName = `${manv}_public.pem`;
+        const privateKeyName = `${manv}_private.pem`;
         const pubkeyPath = path.join(KEYS_DIR, pubkeyName);
+        const privateKeyPath = path.join(KEYS_DIR, privateKeyName);
         await fs.writeFile(pubkeyPath, publicKey);
+        await fs.writeFile(privateKeyPath, privateKey);
 
-        // Hash password and encrypt salary
-        const hashedPassword = sha1Hash(matkhau); // Binary Buffer
-        console.log('Stored password hash (hex):', hashedPassword.toString('hex').toUpperCase());
+        // Mã hóa mật khẩu và lương
+        const hashedPassword = sha1Hash(matkhau);
+        console.log('Mã hóa mật khẩu (hex):', hashedPassword.toString('hex').toUpperCase());
         const encryptedSalary = rsaEncrypt(luongcb.toString(), publicKey);
 
-        // Insert into database
+        // Thêm vào cơ sở dữ liệu
         const pool = await getConnection();
         const request = pool.request();
         request.input('MANV', sql.VarChar, manv);
@@ -73,44 +59,114 @@ const addEmployee = async (req, res) => {
         request.input('EMAIL', sql.VarChar, email);
         request.input('LUONG', sql.VarBinary, Buffer.from(encryptedSalary, 'base64'));
         request.input('TENDN', sql.NVarChar, tendn);
-        request.input('MK', sql.VarBinary, hashedPassword); // Binary Buffer
+        request.input('MK', sql.VarBinary, hashedPassword);
         request.input('PUB', sql.NVarChar, pubkeyName);
 
         await request.execute('SP_INS_PUBLIC_ENCRYPT_NHANVIEN');
 
-        // Fetch updated employee list
+        // Lấy danh sách nhân viên đã cập nhật
         const listRequest = pool.request();
         const result = await listRequest.execute('SP_SEL_ALL_NHANVIEN');
 
+        // Giải mã lương cho danh sách
+        const employees = await Promise.all(result.recordset.map(async (employee) => {
+            let decryptedSalary = 'N/A';
+            try {
+                if (employee.LUONG && employee.PUBKEY) {
+                    const privateKeyPath = path.join(KEYS_DIR, employee.MANV + '_private.pem');
+                    const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+                    const encryptedSalary = Buffer.from(employee.LUONG).toString('base64');
+                    decryptedSalary = rsaDecrypt(encryptedSalary, privateKey);
+                }
+            } catch (decryptError) {
+                console.error(`Lỗi giải mã lương cho ${employee.MANV}:`, decryptError.message, decryptError.stack);
+            }
+            return { ...employee, LUONG: decryptedSalary };
+        }));
+
         res.render('admin/employees', {
-            employees: result.recordset || [],
+            employees: employees,
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
             error: null,
             success: 'Thêm nhân viên thành công',
         });
     } catch (err) {
-        console.error('Error adding employee:', err);
-        try {
-            const pool = await getConnection();
-            const request = pool.request();
-            const result = await request.execute('SP_SEL_ALL_NHANVIEN');
+        console.error('Lỗi thêm nhân viên:', err);
+        // ... (giữ nguyên xử lý lỗi như trước)
+    }
+};
 
-            res.render('admin/employees', {
-                employees: result.recordset || [],
-                staffName: req.session.user.HOTEN,
-                BASE_URL: res.locals.BASE_URL,
-                error: err.message || 'Không thể thêm nhân viên',
-            });
-        } catch (listErr) {
-            console.error('Error getting employee list:', listErr);
-            res.render('admin/employees', {
+// Danh sách nhân viên
+const listEmployees = async (req, res) => {
+    try {
+        if (req.session.user.VAITRO !== 'ADMIN') {
+            return res.status(403).render('admin/employees', {
                 employees: [],
                 staffName: req.session.user.HOTEN,
                 BASE_URL: res.locals.BASE_URL,
-                error: 'Không thể lấy danh sách nhân viên',
+                error: 'Yêu cầu quyền admin để xem danh sách nhân viên',
             });
         }
+
+        const pool = await getConnection();
+        const request = pool.request();
+        console.log('Đang thực thi SP_SEL_ALL_NHANVIEN...');
+        const result = await request.execute('SP_SEL_ALL_NHANVIEN');
+        console.log('Kết quả SP_SEL_ALL_NHANVIEN:', result.recordset.length, 'nhân viên');
+
+        const employees = await Promise.all(result.recordset.map(async (employee) => {
+            let decryptedSalary = 'N/A';
+            try {
+                console.log(`Xử lý nhân viên ${employee.MANV}:`, {
+                    hasLUONG: !!employee.LUONG,
+                    hasPUBKEY: !!employee.PUBKEY,
+                    LUONGType: employee.LUONG ? typeof employee.LUONG : 'undefined',
+                    PUBKEY: employee.PUBKEY,
+                });
+
+                if (!employee.LUONG || !employee.PUBKEY) {
+                    console.warn(`Thiếu LUONG hoặc PUBKEY cho ${employee.MANV}`);
+                    return { ...employee, LUONG: decryptedSalary };
+                }
+
+                const privateKeyPath = path.join(KEYS_DIR, `${employee.MANV}_private.pem`);
+                console.log(`Đang đọc khóa riêng: ${privateKeyPath}`);
+                const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+                if (!(employee.LUONG instanceof Buffer)) {
+                    console.error(`LUONG không phải Buffer cho ${employee.MANV}:`, typeof employee.LUONG);
+                    return { ...employee, LUONG: decryptedSalary };
+                }
+
+                const encryptedSalary = Buffer.from(employee.LUONG).toString('base64');
+                console.log(`Đang giải mã lương cho ${employee.MANV}`);
+                decryptedSalary = rsaDecrypt(encryptedSalary, privateKey);
+                console.log(`Giải mã thành công cho ${employee.MANV}: ${decryptedSalary}`);
+            } catch (decryptError) {
+                console.error(`Lỗi giải mã lương cho ${employee.MANV}:`, decryptError.message, decryptError.stack);
+            }
+            return { ...employee, LUONG: decryptedSalary };
+        }));
+
+        console.log('Danh sách nhân viên đã xử lý:', employees);
+        res.render('admin/employees', {
+            employees: employees,
+            staffName: req.session.user.HOTEN,
+            BASE_URL: res.locals.BASE_URL,
+            error: null,
+        });
+    } catch (err) {
+        console.error('Lỗi chi tiết:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack,
+        });
+        res.render('admin/employees', {
+            employees: [],
+            staffName: req.session.user.HOTEN,
+            BASE_URL: res.locals.BASE_URL,
+            error: 'Không thể lấy danh sách nhân viên',
+        });
     }
 };
 

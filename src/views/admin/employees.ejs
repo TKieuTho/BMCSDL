@@ -341,39 +341,38 @@
                         <form id="addEmployeeFormContent" action="<%= BASE_URL %>/admin/employees/add" method="POST" onsubmit="return handleAddEmployeeSubmit(event)">
                             <div class="modal-body">
                                 <div class="form-group">
-                                    <label for="manv">Mã nhân viên:</label>
+                                    <label for="manv">Mã nhân viên: <span class="required">*</span></label>
                                     <input type="text" id="manv" name="manv" required 
                                         pattern="[A-Za-z0-9]+" 
                                         title="Mã nhân viên chỉ được chứa chữ cái và số"
                                         placeholder="VD: NV01">
                                 </div>
                                 <div class="form-group">
-                                    <label for="hoten">Họ tên:</label>
+                                    <label for="hoten">Họ tên: <span class="required">*</span></label>
                                     <input type="text" id="hoten" name="hoten" required
                                         placeholder="VD: Nguyễn Văn A">
                                 </div>
                                 <div class="form-group">
-                                    <label for="email">Email:</label>
+                                    <label for="email">Email: <span class="required">*</span></label>
                                     <input type="email" id="email" name="email" required
                                         pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                                         title="Email phải có định dạng: example@domain.com"
-                                        placeholder="VD: nva@example.com"
-                                        oninput="validateEmail(this)">
+                                        placeholder="VD: nva@example.com">
                                 </div>
                                 <div class="form-group">
-                                    <label for="luongcb">Lương cơ bản:</label>
+                                    <label for="luongcb">Lương cơ bản: <span class="required">*</span></label>
                                     <input type="number" id="luongcb" name="luongcb" required min="0"
                                         placeholder="VD: 5000000">
                                 </div>
                                 <div class="form-group">
-                                    <label for="tendn">Tên đăng nhập:</label>
+                                    <label for="tendn">Tên đăng nhập: <span class="required">*</span></label>
                                     <input type="text" id="tendn" name="tendn" required
                                         pattern="[A-Za-z0-9]+"
                                         title="Tên đăng nhập chỉ được chứa chữ cái và số"
                                         placeholder="VD: nva">
                                 </div>
                                 <div class="form-group">
-                                    <label for="matkhau">Mật khẩu:</label>
+                                    <label for="matkhau">Mật khẩu: <span class="required">*</span></label>
                                     <input type="password" id="matkhau" name="matkhau" required
                                         minlength="6"
                                         title="Mật khẩu phải có ít nhất 6 ký tự"
@@ -524,21 +523,6 @@
                 showMessage('Lỗi khi tải danh sách nhân viên', 'error');
             }
 
-            // Handle salary (RSA-encrypted, not decryptable client-side)
-            function decryptSalary(encryptedSalary) {
-                if (!encryptedSalary || !encryptedSalary.data) {
-                    console.log('No salary data provided');
-                    return 'N/A';
-                }
-                try {
-                    console.log('Salary buffer:', encryptedSalary.data);
-                    return 'Encrypted'; // Cannot decrypt client-side without private key
-                } catch (error) {
-                    console.error('Error processing salary:', error);
-                    return 'N/A';
-                }
-            }
-
             const itemsPerPage = 7;
             let currentPage = 1;
             let filteredEmployees = [...employees];
@@ -600,7 +584,7 @@
                             <td>${employee.HOTEN || ''}</td>
                             <td>${employee.EMAIL || ''}</td>
                             <td>${employee.TENDN || ''}</td>
-                            <td>${decryptSalary(employee.LUONG)}</td>
+                            <td>${employee.LUONG || 'N/A'}</td>
                             <td>
                                 <button class="edit-btn" onclick="event.stopPropagation(); showEditEmployee(this)">
                                     <i class="fas fa-edit"></i> Sửa
@@ -955,6 +939,12 @@
                 const form = document.getElementById('addEmployeeFormContent');
                 const formData = new FormData(form);
 
+                // Log form data for debugging
+                console.log('Form data before submission:');
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}: ${key === 'matkhau' ? '******' : value}`);
+                }
+
                 try {
                     // Input validation
                     const manv = formData.get('manv');
@@ -980,11 +970,15 @@
                     // Submit form directly
                     const response = await fetch(form.action, {
                         method: 'POST',
-                        body: formData
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams(formData)
                     });
 
                     if (!response.ok) {
-                        throw new Error('Lỗi khi thêm nhân viên');
+                        const errorData = await response.text();
+                        throw new Error(errorData || 'Lỗi khi thêm nhân viên');
                     }
 
                     // Close modal and reload page
