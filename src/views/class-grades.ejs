@@ -142,8 +142,8 @@
     </div>
 
     <script>
-        const students = <%- JSON.stringify(students) %>;
-        const subjects = <%- JSON.stringify(subjects) %>;
+        const students = JSON.parse('<%- students %>');
+        const subjects = JSON.parse('<%- JSON.stringify(subjects) %>');
         const itemsPerPage = 7;
         let currentPage = 1;
         let selectedSubject = subjects[0]?.MAHP || '';
@@ -298,8 +298,8 @@
                     if (!confirm('Bạn có chắc chắn muốn lưu điểm này?')) return;
 
                     try {
-                        const grade = { mahp, diemthi: parseFloat(diemthi), malop };
-                        console.log('Sending grade update:', { masv, ...grade });
+                        const grade = { masv, mahp, diemthi: parseFloat(diemthi), malop };
+                        console.log('Sending grade update:', grade);
                         const response = await fetch(`<%= BASE_URL %>/grades/${masv}/grade`, {
                             method: 'POST',
                             headers: {
@@ -315,10 +315,12 @@
                         try {
                             result = JSON.parse(text);
                         } catch (err) {
+                            console.error('Error parsing response:', err);
                             throw new Error(`Phản hồi không phải JSON: ${text}`);
                         }
 
                         if (!result.success) {
+                            console.error('Update failed:', result.error);
                             throw new Error(result.error || 'Lỗi khi cập nhật điểm');
                         }
 

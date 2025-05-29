@@ -5,16 +5,27 @@ const {
     listClasses, 
     getClassDetails, 
     addStudent, 
-    updateStudent
+    updateStudent,
+    assignClassesToEmployee,
+    getEmployeeClasses,
+    getUnassignedClasses
 } = require('../controllers/classController');
 const { getClassGrades } = require('../controllers/gradeController');
 
-// Class routes
-router.get('/', requireLogin, listClasses);
-router.get('/:id', requireLogin, getClassDetails);
-router.get('/:id/grades', requireLogin, getClassGrades);
-router.post('/:id/grades', requireLogin, getClassGrades);
-router.post('/:id/add-student', requireLogin, addStudent);
-router.post('/student/:classId/update', requireLogin, updateStudent);
+// Apply middleware to all routes
+router.use(requireLogin);
+
+// Routes
+router.get('/', listClasses);
+router.get('/unassigned', getUnassignedClasses);
+router.get('/:id', getClassDetails);
+router.get('/:id/grades', getClassGrades);
+router.post('/:id/grades', getClassGrades);
+router.post('/:id/add-student', addStudent);
+router.post('/student/:classId/update', updateStudent);
+
+// Employee class management routes
+router.get('/employee/:manv', getEmployeeClasses);
+router.post('/classes/assign', assignClassesToEmployee);
 
 module.exports = router; 

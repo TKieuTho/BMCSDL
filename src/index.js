@@ -9,6 +9,7 @@ const { connectDB } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const classRoutes = require('./routes/classRoutes');
 const gradeRoutes = require('./routes/gradeRoutes');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +55,7 @@ connectDB();
 app.use('/auth', authRoutes);
 app.use('/grades', gradeRoutes);
 app.use('/class', classRoutes);
+app.use('/admin', adminRoutes);
 
 // Root route redirects to login
 app.get('/', (req, res) => {

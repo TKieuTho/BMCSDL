@@ -1,12 +1,13 @@
 const { sql, getConnection } = require('../config/database');
 const transporter = require('../config/email');
 const retry = require('async-retry');
+const { sha1Hash } = require('../utils/crypto');
 
 const showLoginPage = (req, res) => {
     res.render('login', { error: null, success: null });
 };
 const showForgotPasswordPage = (req, res) => {
-    res.render('forgot-password', { error: null, success: null }); // Adjust template name as needed
+    res.render('forgot-password', { error: null, success: null }); 
 };
 
 const login = async (req, res) => {
@@ -15,28 +16,44 @@ const login = async (req, res) => {
 
     let connection;
     try {
+        // Input validation
+        if (!manv || !password) {
+            return res.render('login', { error: 'Mã nhân viên và mật khẩu không được để trống' });
+        }
+
+        // Hash password with SHA1 (returns binary Buffer)
+        const hashedPassword = sha1Hash(password);
+        console.log('Hashed password (hex):', hashedPassword.toString('hex').toUpperCase());
+
         connection = await getConnection();
         const request = connection.request();
         request.input('MANV', sql.VarChar, manv);
-        request.input('MATKHAU', sql.NVarChar, password);
+        request.input('MATKHAU', sql.VarBinary, hashedPassword); // Use binary Buffer directly
 
         const result = await request.execute('SP_LOGIN_NHANVIEN');
-
-        console.log('Login result:', result.recordset); // Debug log
+        console.log('Login result:', result.recordset);
 
         if (result.recordset && result.recordset.length > 0) {
             const user = result.recordset[0];
+            // Set user session with original role logic
             req.session.user = {
                 MANV: user.MANV,
                 HOTEN: user.HOTEN,
-                password: password // Store password for later use
+                VAITRO: user.MANV === 'NV01' ? 'ADMIN' : 'EMPLOYEE',
             };
             console.log('Session user set:', req.session.user);
+
             req.session.save((err) => {
                 if (err) {
                     console.error('Session save error:', err);
+                    return res.render('login', { error: 'Lỗi lưu phiên đăng nhập' });
                 }
-                res.redirect('/class');
+                // Redirect based on role
+                if (req.session.user.VAITRO === 'ADMIN') {
+                    res.redirect('/admin/employees');
+                } else {
+                    res.redirect('/class');
+                }
             });
         } else {
             res.render('login', { error: 'Mã nhân viên hoặc mật khẩu không đúng' });
@@ -56,6 +73,7 @@ const login = async (req, res) => {
         res.render('login', { error: errorMessage });
     }
 };
+
 
 const forgotPassword = async (req, res) => {
     const { email, manv } = req.body;

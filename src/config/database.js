@@ -17,7 +17,7 @@ const config = {
     database: process.env.DB_DATABASE || 'QLSVNhom',
     port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: true,
+        encrypt: false,
         trustServerCertificate: true,
         enableArithAbort: true,
         connectTimeout: 30000, // 30 seconds
@@ -35,41 +35,29 @@ let pool;
 async function connectDB() {
     try {
         if (!pool) {
-            console.log('Attempting to connect to database with config:', {
-                server: config.server,
-                database: config.database,
-                user: config.user,
-                port: config.port
-            });
-            
-            // Try to connect with Windows Authentication first
-            try {
-                pool = await sql.connect({
-                    ...config,
-                    options: {
-                        ...config.options,
-                        trustedConnection: true,
-                        trustServerCertificate: true
+            console.log('Creating new connection pool...');
+            pool = await new sql.ConnectionPool(config).connect();
+            console.log('Connection pool created successfully');
+
+            // Handle pool errors
+            pool.on('error', async (err) => {
+                console.error('Pool error:', err);
+                if (err.code === 'ECONNCLOSED') {
+                    console.log('Attempting to reconnect...');
+                    try {
+                        pool = await new sql.ConnectionPool(config).connect();
+                        console.log('Reconnected successfully');
+                    } catch (reconnectErr) {
+                        console.error('Reconnection failed:', reconnectErr);
                     }
-                });
-                console.log('Connected to database successfully using Windows Authentication');
-            } catch (windowsAuthError) {
-                console.log('Windows Authentication failed, trying SQL Server Authentication...');
-                // If Windows Authentication fails, try SQL Server Authentication
-                pool = await sql.connect(config);
-                console.log('Connected to database successfully using SQL Server Authentication');
-            }
+                }
+            });
         }
         return pool;
     } catch (err) {
         console.error('Database connection failed:', err);
         if (err.code === 'ETIMEOUT') {
             console.error('Connection timed out. Please check if SQL Server is running and accessible.');
-            console.error('Troubleshooting steps:');
-            console.error('1. Make sure SQL Server is running');
-            console.error('2. Check if you can connect using SQL Server Management Studio');
-            console.error('3. Verify the server name and port');
-            console.error('4. Check if SQL Server Browser service is running');
         } else if (err.code === 'ELOGIN') {
             console.error('Login failed. Please check your credentials.');
         }
@@ -81,6 +69,9 @@ async function getConnection() {
     try {
         if (!pool) {
             await connectDB();
+        } else if (!pool.connected) {
+            console.log('Pool disconnected, reconnecting...');
+            await connectDB();
         }
         return pool;
     } catch (err) {
@@ -88,6 +79,19 @@ async function getConnection() {
         throw err;
     }
 }
+
+// Handle application shutdown
+process.on('SIGINT', async () => {
+    if (pool) {
+        try {
+            await pool.close();
+            console.log('Database connection pool closed');
+        } catch (err) {
+            console.error('Error closing connection pool:', err);
+        }
+    }
+    process.exit(0);
+});
 
 module.exports = {
     sql,

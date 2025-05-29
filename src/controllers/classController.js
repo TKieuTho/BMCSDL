@@ -1,49 +1,42 @@
 const { sql, getConnection } = require('../config/database');
+const { sha1Hash } = require('../utils/crypto');
 
 const listClasses = async (req, res) => {
-    if (!req.session.user || !req.session.user.MANV) {
-        console.log('Session user missing or MANV undefined:', req.session.user);
-        return res.redirect('/auth/login');
-    }
-
-    let connection;
     try {
-        connection = await getConnection();
-        const request = connection.request();
-        request.input('MANV', sql.VarChar, req.session.user.MANV);
-
-        console.log('MANV from session:', req.session.user.MANV);
-
-        const result = await request.execute('SP_SEL_LOP_BY_MANV');
-
-        console.log('Query result:', result);
-        console.log('Classes data:', result.recordset);
+        const pool = await getConnection();
+        const request = pool.request();
+        
+        // Get list of classes
+        const classesResult = await request.execute('SP_LayDanhSachLop');
+        
+        // If user is admin, get list of employees for the dropdown
+        let employees = [];
+        if (req.session.user.ISADMIN) {
+            const employeesResult = await request.execute('SP_SEL_ALL_NHANVIEN');
+            employees = employeesResult.recordset || [];
+        }
 
         res.render('classes', {
-            classes: result.recordset || [],
+            classes: classesResult.recordset || [],
+            employees: employees,
             staffName: req.session.user.HOTEN,
-            BASE_URL: res.locals.BASE_URL || 'http://localhost:3001',
+            BASE_URL: res.locals.BASE_URL,
+            isAdmin: req.session.user.ISADMIN,
             error: null
         });
     } catch (err) {
-        console.error('Error fetching classes:', err);
+        console.error('Error listing classes:', err);
         res.render('classes', {
             classes: [],
-            staffName: req.session.user.HOTEN || 'Unknown',
-            BASE_URL: res.locals.BASE_URL || 'http://localhost:3001',
+            employees: [],
+            staffName: req.session.user.HOTEN,
+            BASE_URL: res.locals.BASE_URL,
+            isAdmin: req.session.user.ISADMIN,
             error: 'Không thể lấy danh sách lớp'
         });
-    } finally {
-        if (connection) {
-            try {
-                connection.release(); // Release the connection back to the pool
-                console.log('Database connection released back to pool');
-            } catch (releaseErr) {
-                console.error('Error releasing connection:', releaseErr);
-            }
-        }
     }
 };
+
 const getClassDetails = async (req, res) => {
     let connection;
     try {
@@ -59,9 +52,8 @@ const getClassDetails = async (req, res) => {
         const result = await request.execute('SP_SEL_SINHVIEN_BY_LOP');
         console.log('Students fetched successfully');
 
-        // Get list of subjects for grade input
+        // Lấy danh sách môn học
         const subjectsRequest = connection.request();
-        subjectsRequest.input('MANV', sql.VarChar, req.session.user.MANV);
         const subjectsResult = await subjectsRequest.execute('SP_SEL_HOCPHAN');
         console.log('Subjects fetched successfully');
         
@@ -106,17 +98,22 @@ const getClassDetails = async (req, res) => {
 const addStudent = async (req, res) => {
     const classId = req.params.id;
     const { masv, hoten, ngaysinh, diachi, tendn, matkhau } = req.body;
+    let connection;
 
     try {
-        const pool = await sql.connect();
-        const request = pool.request();
+        connection = await getConnection();
+        const request = connection.request();
+        
+        // Convert password to binary using SHA1 hash
+        const hashedPassword = Buffer.from(sha1Hash(matkhau), 'binary');
+        
         request.input('MASV', sql.VarChar, masv);
         request.input('HOTEN', sql.NVarChar, hoten);
         request.input('NGAYSINH', sql.Date, ngaysinh);
         request.input('DIACHI', sql.NVarChar, diachi);
         request.input('MALOP', sql.VarChar, classId);
         request.input('TENDN', sql.NVarChar, tendn);
-        request.input('MK', sql.NVarChar, matkhau);
+        request.input('MK', sql.VarBinary(sql.MAX), hashedPassword);
         request.input('MANV', sql.VarChar, req.session.user.MANV);
 
         await request.execute('SP_INS_SINHVIEN');
@@ -125,6 +122,15 @@ const addStudent = async (req, res) => {
     } catch (err) {
         console.error('Error adding student:', err);
         res.status(500).json({ error: 'Không thể thêm sinh viên' });
+    } finally {
+        if (connection) {
+            try {
+                connection.release();
+                console.log('Database connection released back to pool');
+            } catch (releaseErr) {
+                console.error('Error releasing connection:', releaseErr);
+            }
+        }
     }
 };
 
@@ -267,10 +273,135 @@ const updateStudent = async (req, res) => {
     }
 };
 
+/// Tích hợp assignClassToEmployee với assignMultipleClasses
+const assignClassesToEmployee = async (req, res) => {
+    const { manv, malop, classes } = req.body;
+    
+    try {
+        const pool = await getConnection();
+        
+        // Xác định danh sách lớp cần phân công
+        let classesToAssign = [];
+        
+        if (classes && Array.isArray(classes)) {
+            // Trường hợp phân công nhiều lớp
+            classesToAssign = classes;
+        } else if (malop) {
+            // Trường hợp phân công một lớp
+            classesToAssign = [malop];
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Vui lòng chọn ít nhất một lớp để phân công'
+            });
+        }
+
+        const results = [];
+        let successCount = 0;
+        
+        // Phân công từng lớp
+        for (const classId of classesToAssign) {
+            try {
+                const request = pool.request();
+                request.input('MALOP', sql.VarChar, classId);
+                request.input('MANV', sql.VarChar, manv);
+                
+                await request.execute('SP_PhanLopChoNhanVien');
+                results.push({ 
+                    malop: classId, 
+                    success: true,
+                    message: 'Phân công thành công'
+                });
+                successCount++;
+            } catch (err) {
+                console.error(`Error assigning class ${classId}:`, err);
+                results.push({ 
+                    malop: classId, 
+                    success: false, 
+                    error: err.message || 'Lỗi không xác định'
+                });
+            }
+        }
+        
+        // Lấy danh sách lớp cập nhật
+        const updatedClasses = await pool.request().execute('SP_LayDanhSachLop');
+        
+        const message = successCount === classesToAssign.length 
+            ? `Phân công thành công ${successCount} lớp`
+            : `Phân công thành công ${successCount}/${classesToAssign.length} lớp`;
+        
+        res.json({
+            success: successCount > 0,
+            message: message,
+            results: results,
+            classes: updatedClasses.recordset || []
+        });
+        
+    } catch (err) {
+        console.error('Error in assignClassesToEmployee:', err);
+        res.status(500).json({
+            success: false,
+            error: err.message || 'Không thể phân công lớp'
+        });
+    }
+};
+
+// Lấy danh sách lớp của nhân viên cụ thể
+const getEmployeeClasses = async (req, res) => {
+    try {
+        const manv = req.params.manv;
+        const pool = await getConnection();
+        const request = pool.request();
+        
+        // Sử dụng stored procedure SP_SEL_LOP_BY_MANV
+        request.input('MANV', sql.VarChar, manv);
+        const result = await request.execute('SP_SEL_LOP_BY_MANV');
+        
+        res.json({
+            success: true,
+            classes: result.recordset || []
+        });
+    } catch (err) {
+        console.error('Error fetching employee classes:', err);
+        res.status(500).json({
+            success: false,
+            error: 'Không thể lấy danh sách lớp của nhân viên'
+        });
+    }
+};
+
+// Lấy danh sách lớp chưa được phân công
+const getUnassignedClasses = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const request = pool.request();
+        
+        // Lấy danh sách lớp chưa được phân công (MANV là null)
+        const result = await request.query(`
+            SELECT MALOP, TENLOP
+            FROM LOP
+            WHERE MANV IS NULL
+        `);
+        
+        res.json({
+            success: true,
+            classes: result.recordset || []
+        });
+    } catch (err) {
+        console.error('Error fetching unassigned classes:', err);
+        res.status(500).json({
+            success: false,
+            error: 'Không thể lấy danh sách lớp chưa được phân công'
+        });
+    }
+};
 
 module.exports = {
     listClasses,
     getClassDetails,
     addStudent,
-    updateStudent
+    updateStudent,
+    assignClassesToEmployee,
+    getEmployeeClasses,
+    getUnassignedClasses
 }; 

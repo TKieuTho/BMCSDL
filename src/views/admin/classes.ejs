@@ -1,0 +1,128 @@
+<%- include('../partials/header') %>
+
+<div class="container mt-4">
+    <h2>Quản lý lớp học</h2>
+    
+    <% if (error) { %>
+        <div class="alert alert-danger" role="alert">
+            <%= error %>
+        </div>
+    <% } %>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Mã lớp</th>
+                    <th>Tên lớp</th>
+                    <th>Người quản lý</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% classes.forEach(function(lop) { %>
+                    <tr>
+                        <td><%= lop.MALOP %></td>
+                        <td><%= lop.TENLOP %></td>
+                        <td>
+                            <% if (lop.TENNGUOIQUANLY) { %>
+                                <%= lop.TENNGUOIQUANLY %>
+                            <% } else { %>
+                                <span class="text-muted">Chưa có người quản lý</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <% if (!lop.MANV) { %>
+                                <button class="btn btn-primary btn-sm assign-class" 
+                                        data-malop="<%= lop.MALOP %>"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#assignClassModal">
+                                    Phân lớp
+                                </button>
+                            <% } %>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal for assigning class -->
+<div class="modal fade" id="assignClassModal" tabindex="-1" aria-labelledby="assignClassModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignClassModalLabel">Phân lớp cho nhân viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignClassForm">
+                    <input type="hidden" id="selectedMalop" name="malop">
+                    <div class="mb-3">
+                        <label for="manv" class="form-label">Chọn nhân viên</label>
+                        <select class="form-select" id="manv" name="manv" required>
+                            <option value="">Chọn nhân viên...</option>
+                            <% employees.forEach(function(employee) { %>
+                                <option value="<%= employee.MANV %>"><%= employee.HOTEN %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" id="confirmAssign">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle assign class button click
+    const assignButtons = document.querySelectorAll('.assign-class');
+    assignButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const malop = this.dataset.malop;
+            document.getElementById('selectedMalop').value = malop;
+        });
+    });
+
+    // Handle confirm assign button click
+    document.getElementById('confirmAssign').addEventListener('click', async function() {
+        const form = document.getElementById('assignClassForm');
+        const formData = new FormData(form);
+        const data = {
+            malop: formData.get('malop'),
+            manv: formData.get('manv')
+        };
+
+        try {
+            const response = await fetch('/admin/classes/assign', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                // Close modal and refresh page
+                const modal = bootstrap.Modal.getInstance(document.getElementById('assignClassModal'));
+                modal.hide();
+                window.location.reload();
+            } else {
+                alert(result.error || 'Có lỗi xảy ra');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Có lỗi xảy ra khi phân lớp');
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer') %> 
