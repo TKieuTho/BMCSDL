@@ -584,7 +584,7 @@
                             <td>${employee.HOTEN || ''}</td>
                             <td>${employee.EMAIL || ''}</td>
                             <td>${employee.TENDN || ''}</td>
-                            <td>${employee.LUONG || 'N/A'}</td>
+                            <td>${employee.LUONG ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(employee.LUONG) : 'N/A'}</td>
                             <td>
                                 <button class="edit-btn" onclick="event.stopPropagation(); showEditEmployee(this)">
                                     <i class="fas fa-edit"></i> Sửa

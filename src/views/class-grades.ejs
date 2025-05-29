@@ -144,11 +144,22 @@
     <script>
         const students = JSON.parse('<%- students %>');
         const subjects = JSON.parse('<%- JSON.stringify(subjects) %>');
+        const grades = JSON.parse('<%- grades %>');
         const itemsPerPage = 7;
         let currentPage = 1;
         let selectedSubject = subjects[0]?.MAHP || '';
         let filteredStudents = [...students];
         let totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+
+        // Map grades to students
+        students.forEach(student => {
+            student.grades = {};
+            grades.forEach(grade => {
+                if (grade.MASV === student.MASV) {
+                    student.grades[grade.MAHP] = grade.DIEMTHI;
+                }
+            });
+        });
 
         function filterStudents() {
             const searchValue = document.getElementById('search').value.trim().toLowerCase();
@@ -167,6 +178,16 @@
         function renderStudents(page) {
             const tbody = document.getElementById('grades-tbody');
             tbody.innerHTML = '';
+
+            if (filteredStudents.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center">Không có sinh viên nào</td>
+                    </tr>
+                `;
+                return;
+            }
+
             if (!selectedSubject) {
                 filteredStudents.forEach(student => {
                     const row = document.createElement('tr');
@@ -182,6 +203,7 @@
                 });
                 return;
             }
+
             const start = (page - 1) * itemsPerPage;
             const end = start + itemsPerPage;
             filteredStudents.slice(start, end).forEach(student => {
@@ -191,8 +213,8 @@
                 const grade = student.grades && student.grades[selectedSubject];
                 let gradeText = '-';
                 let color = '#95a5a6';
-                if (grade !== undefined && grade !== null) {
-                    gradeText = grade.toFixed(1);
+                if (grade !== undefined && grade !== null && grade !== 'N/A') {
+                    gradeText = parseFloat(grade).toFixed(1);
                     color = grade >= 5 ? '#2ecc71' : '#e74c3c';
                 }
                 row.innerHTML = `

@@ -384,6 +384,42 @@ BEGIN
 END
 GO
 
+-- Stored Procedure: SP_SEL_BANGDIEM_BY_LOP
+CREATE OR ALTER PROCEDURE SP_SEL_BANGDIEM_BY_LOP
+    @MALOP VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        sv.MASV,
+        sv.HOTEN AS HOTEN_SV,
+        hp.MAHP,
+        hp.TENHP,
+        bd.DIEMTHI
+    FROM 
+        SINHVIEN sv
+        INNER JOIN BANGDIEM bd ON sv.MASV = bd.MASV
+        INNER JOIN HOCPHAN hp ON bd.MAHP = hp.MAHP
+    WHERE 
+        sv.MALOP = @MALOP
+    ORDER BY 
+        sv.MASV, hp.MAHP;
+END
+GO
+
+-- Stored Procedure: SP_SEL_HOCPHAN
+CREATE OR ALTER PROCEDURE SP_SEL_HOCPHAN
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT MAHP, TENHP, SOTC
+    FROM HOCPHAN
+    ORDER BY MAHP;
+END
+GO
+
 PRINT N'Đã tạo lại tất cả stored procedures theo yêu cầu mã hóa.';
 GO
 

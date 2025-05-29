@@ -6,12 +6,62 @@ const listClasses = async (req, res) => {
         const pool = await getConnection();
         const request = pool.request();
         
-        // Get list of classes
-        const classesResult = await request.execute('SP_LayDanhSachLop');
+        // Lấy tham số phân trang
+        const page = parseInt(req.query.page) || 1;
+        const limit = 9; // Số lớp mỗi trang
+        const offset = (page - 1) * limit;
         
-        // If user is admin, get list of employees for the dropdown
+        let classesResult;
+        let totalClasses = 0;
+        
+        // Nếu là admin (NV01), lấy tất cả các lớp
+        if (req.session.user.MANV === 'NV01') {
+            // Lấy tổng số lớp
+            const countResult = await request.query(`
+                SELECT COUNT(*) as total
+                FROM LOP
+            `);
+            totalClasses = countResult.recordset[0].total;
+            
+            // Lấy danh sách lớp có phân trang
+            classesResult = await request.query(`
+                SELECT l.*, nv.HOTEN as TENNGUOIQUANLY
+                FROM LOP l
+                LEFT JOIN NHANVIEN nv ON l.MANV = nv.MANV
+                ORDER BY l.MALOP
+                OFFSET ${offset} ROWS
+                FETCH NEXT ${limit} ROWS ONLY
+            `);
+        } else {
+            // Nếu là nhân viên thường, chỉ lấy các lớp họ quản lý
+            request.input('MANV', sql.VarChar, req.session.user.MANV);
+            
+            // Lấy tổng số lớp của nhân viên
+            const countResult = await request.query(`
+                SELECT COUNT(*) as total
+                FROM LOP
+                WHERE MANV = @MANV
+            `);
+            totalClasses = countResult.recordset[0].total;
+            
+            // Lấy danh sách lớp có phân trang
+            classesResult = await request.query(`
+                SELECT l.*, nv.HOTEN as TENNGUOIQUANLY
+                FROM LOP l
+                LEFT JOIN NHANVIEN nv ON l.MANV = nv.MANV
+                WHERE l.MANV = @MANV
+                ORDER BY l.MALOP
+                OFFSET ${offset} ROWS
+                FETCH NEXT ${limit} ROWS ONLY
+            `);
+        }
+        
+        // Tính toán thông tin phân trang
+        const totalPages = Math.ceil(totalClasses / limit);
+        
+        // Nếu là admin, lấy danh sách nhân viên cho dropdown
         let employees = [];
-        if (req.session.user.ISADMIN) {
+        if (req.session.user.MANV === 'NV01') {
             const employeesResult = await request.execute('SP_SEL_ALL_NHANVIEN');
             employees = employeesResult.recordset || [];
         }
@@ -21,8 +71,11 @@ const listClasses = async (req, res) => {
             employees: employees,
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
-            isAdmin: req.session.user.ISADMIN,
-            error: null
+            isAdmin: req.session.user.MANV === 'NV01',
+            error: null,
+            currentPage: page,
+            totalPages: totalPages,
+            totalClasses: totalClasses
         });
     } catch (err) {
         console.error('Error listing classes:', err);
@@ -31,8 +84,11 @@ const listClasses = async (req, res) => {
             employees: [],
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
-            isAdmin: req.session.user.ISADMIN,
-            error: 'Không thể lấy danh sách lớp'
+            isAdmin: req.session.user.MANV === 'NV01',
+            error: 'Không thể lấy danh sách lớp',
+            currentPage: 1,
+            totalPages: 1,
+            totalClasses: 0
         });
     }
 };
@@ -101,36 +157,81 @@ const addStudent = async (req, res) => {
     let connection;
 
     try {
+        // Validate input
+        if (!masv || !hoten || !ngaysinh || !tendn || !matkhau) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Vui lòng nhập đầy đủ thông tin bắt buộc' 
+            });
+        }
+
+        // Validate date format
+        const parsedDate = new Date(ngaysinh);
+        if (isNaN(parsedDate)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Ngày sinh không hợp lệ' 
+            });
+        }
+
         connection = await getConnection();
         const request = connection.request();
         
         // Convert password to binary using SHA1 hash
         const hashedPassword = Buffer.from(sha1Hash(matkhau), 'binary');
         
-        request.input('MASV', sql.VarChar, masv);
-        request.input('HOTEN', sql.NVarChar, hoten);
-        request.input('NGAYSINH', sql.Date, ngaysinh);
-        request.input('DIACHI', sql.NVarChar, diachi);
-        request.input('MALOP', sql.VarChar, classId);
-        request.input('TENDN', sql.NVarChar, tendn);
+        request.input('MASV', sql.VarChar(20), masv);
+        request.input('HOTEN', sql.NVarChar(100), hoten);
+        request.input('NGAYSINH', sql.Date, parsedDate);
+        request.input('DIACHI', sql.NVarChar(200), diachi || '');
+        request.input('MALOP', sql.VarChar(20), classId);
+        request.input('TENDN', sql.NVarChar(100), tendn);
         request.input('MK', sql.VarBinary(sql.MAX), hashedPassword);
-        request.input('MANV', sql.VarChar, req.session.user.MANV);
+        request.input('MANV', sql.VarChar(20), req.session.user.MANV);
 
         await request.execute('SP_INS_SINHVIEN');
+
+        // Lấy lại danh sách sinh viên sau khi thêm
+        const updatedListRequest = connection.request();
+        updatedListRequest.input('MALOP', sql.VarChar(20), classId);
+        const updatedResult = await updatedListRequest.execute('SP_SEL_SINHVIEN_BY_LOP');
+
+        if (req.xhr || req.headers['x-requested-with'] === 'XMLHttpRequest') {
+            return res.json({
+                success: true,
+                message: 'Thêm sinh viên thành công',
+                data: {
+                    students: updatedResult.recordset || []
+                }
+            });
+        }
 
         res.redirect(`/class/${classId}`);
     } catch (err) {
         console.error('Error adding student:', err);
-        res.status(500).json({ error: 'Không thể thêm sinh viên' });
-    } finally {
-        if (connection) {
-            try {
-                connection.release();
-                console.log('Database connection released back to pool');
-            } catch (releaseErr) {
-                console.error('Error releasing connection:', releaseErr);
-            }
+        let errorMessage = 'Không thể thêm sinh viên';
+        
+        if (err.message.includes('quyền')) {
+            errorMessage = 'Bạn không có quyền thêm sinh viên vào lớp này';
+        } else if (err.message.includes('duplicate')) {
+            errorMessage = 'Mã sinh viên hoặc tên đăng nhập đã tồn tại';
         }
+
+        if (req.xhr || req.headers['x-requested-with'] === 'XMLHttpRequest') {
+            return res.status(500).json({ 
+                success: false, 
+                error: errorMessage 
+            });
+        }
+
+        res.status(500).render('class-details', {
+            error: errorMessage,
+            students: [],
+            subjects: [],
+            classId: classId,
+            staffName: req.session.user?.HOTEN || 'Unknown',
+            BASE_URL: res.locals.BASE_URL
+        });
     }
 };
 

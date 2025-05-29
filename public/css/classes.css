@@ -9,7 +9,7 @@
     --gray-color: #6b7280;
     --light-gray: #f3f4f6;
     --dark-gray: #374151;
-    --border-radius: 8px;
+    --border-radius: 10px; /* Tăng nhẹ border-radius để nổi bật */
     --transition: all 0.3s ease;
 }
 
@@ -47,9 +47,21 @@ header {
 }
 
 .header-info h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     color: #2c3e50;
     font-size: 24px;
     margin-bottom: 5px;
+}
+
+.header-info h1 .header-icon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'/%3E%3Cpolyline points='22,6 12,13 2,6'/%3E%3C/svg%3E"); /* Icon danh sách lớp */
+    background-size: contain;
+    background-repeat: no-repeat;
 }
 
 .welcome-text {
@@ -57,37 +69,62 @@ header {
     font-size: 14px;
 }
 
-/* Button styles */
+/* Header Buttons */
 .header-buttons {
     display: flex;
-    gap: 12px;
+    gap: 10px;
+}
+
+.header-buttons a, .header-buttons button {
+    padding: 10px 16px;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.btn-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.manage-btn {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+}
+
+.manage-btn .btn-icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); /* Icon quản lý nhân viên */
+}
+
+.manage-btn:hover {
+    background-color: #0284c7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .logout-btn {
     background-color: var(--danger-color);
     color: white;
-    padding: 10px 20px;
     border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logout-btn .btn-icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cpath d='M21 12H9'/%3E%3C/svg%3E"); /* Icon đăng xuất */
 }
 
 .logout-btn:hover {
-    background-color: #dc2626;
+    background-color: #b91c1c;
     transform: translateY(-2px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.logout-btn:active {
-    transform: translateY(0);
 }
 
 /* Error message styles */
@@ -107,52 +144,88 @@ header {
 
 .class-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    margin-top: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Tăng kích thước tối thiểu của card */
+    gap: 24px; /* Tăng khoảng cách để tạo cảm giác thoáng */
+    margin-top: 20px;
 }
 
 .class-card {
     background-color: #fff;
-    padding: 24px;
+    padding: 24px; /* Tăng padding để card lớn hơn */
     border-radius: var(--border-radius);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Tăng shadow để nổi bật */
+    border: 1px solid rgba(79, 70, 229, 0.2); /* Thêm viền nhẹ để tăng độ nổi bật */
     transition: var(--transition);
     text-align: center;
+    position: relative;
+    overflow: hidden; /* Đảm bảo nội dung không tràn ra ngoài */
+}
+
+.class-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px; /* Thanh màu ở đầu card */
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); /* Gradient để nổi bật */
+    opacity: 0.8;
 }
 
 .class-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2); /* Shadow mạnh hơn khi hover */
+    border-color: var(--primary-color); /* Viền đổi màu khi hover */
 }
 
 .class-card h2 {
     color: var(--dark-gray);
-    font-size: 20px;
+    font-size: 22px; /* Tăng font-size để nổi bật */
+    font-weight: 600; /* Đậm hơn để thu hút */
     margin-bottom: 12px;
 }
 
 .class-card p {
     color: var(--gray-color);
-    font-size: 14px;
-    margin-bottom: 16px;
+    font-size: 15px; /* Tăng nhẹ font-size */
+    margin-bottom: 12px;
+}
+
+.class-card .manager::before {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.class-card .manager:has(.fa-user-tie)::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); /* Icon người phụ trách */
+}
+
+.class-card .manager:has(.fa-user-slash)::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cline x1='22' y1='2' x2='2' y2='22'/%3E%3C/svg%3E"); /* Icon chưa có người phụ trách */
 }
 
 .view-btn {
     background-color: var(--primary-color);
     color: white;
-    padding: 10px 20px;
+    padding: 12px 24px; /* Tăng padding để nút lớn hơn */
     border: none;
     border-radius: var(--border-radius);
-    cursor: pointer;
-    font-size: 14px;
+    font-size: 15px; /* Tăng font-size */
     font-weight: 500;
     text-decoration: none;
-    transition: var(--transition);
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: var(--transition);
+}
+
+.view-btn .btn-icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); /* Icon xem chi tiết */
 }
 
 .view-btn:hover {
@@ -161,14 +234,10 @@ header {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.view-btn:active {
-    transform: translateY(0);
-}
-
 .no-data {
     text-align: center;
     color: var(--gray-color);
-    padding: 24px;
+    padding: 20px;
     font-style: italic;
     font-size: 16px;
 }
@@ -177,12 +246,13 @@ header {
 @media (max-width: 768px) {
     .header-buttons {
         flex-direction: column;
+        gap: 8px;
         width: 100%;
     }
 
-    .logout-btn {
+    .header-buttons a, .header-buttons button {
         width: 100%;
-        margin-bottom: 8px;
+        justify-content: center;
     }
 
     .class-grid {
@@ -206,10 +276,15 @@ header {
     }
 
     .class-card {
-        padding: 16px;
+        padding: 18px; /* Giảm nhẹ padding trên màn hình nhỏ */
     }
 
     .class-card h2 {
-        font-size: 18px;
+        font-size: 20px; /* Giảm font-size trên màn hình nhỏ */
+    }
+
+    .view-btn {
+        padding: 10px 20px; /* Giảm padding nút trên màn hình nhỏ */
+        font-size: 14px;
     }
 }
