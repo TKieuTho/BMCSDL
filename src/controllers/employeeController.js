@@ -205,34 +205,80 @@ const updateEmployee = async (req, res) => {
         const hashedPassword = sha1Hash(matkhau);
         const encryptedSalary = rsaEncrypt(luongcb.toString(), publicKey);
 
-        // Update employee
+        // Update employee using SP_UPD_PUBLIC_ENCRYPT_NHANVIEN
         const result = await pool.request()
             .input('MANV', sql.VarChar, manv)
             .input('HOTEN', sql.NVarChar, hoten)
             .input('EMAIL', sql.VarChar, email)
             .input('LUONG', sql.VarBinary, Buffer.from(encryptedSalary, 'base64'))
             .input('TENDN', sql.NVarChar, tendn)
-            .input('MATKHAU', sql.VarBinary, Buffer.from(hashedPassword, 'base64'))
+            .input('MATKHAU', sql.VarBinary, hashedPassword)
+            .input('PUBKEY', sql.VarChar, pubkeyName)
             .execute('SP_UPD_NHANVIEN');
 
-        // Fetch updated employee list
-        const employees = await pool.request().execute('SP_SEL_ALL_NHANVIEN');
+        // Fetch updated employee list and decrypt salaries
+        const listResult = await pool.request().execute('SP_SEL_ALL_NHANVIEN');
+        
+        // Decrypt salaries for the employee list
+        const employees = await Promise.all(listResult.recordset.map(async (employee) => {
+            let decryptedSalary = 'N/A';
+            try {
+                if (employee.LUONG && employee.PUBKEY) {
+                    const privateKeyPath = path.join(KEYS_DIR, employee.MANV + '_private.pem');
+                    const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+                    const encryptedSalary = Buffer.from(employee.LUONG).toString('base64');
+                    decryptedSalary = rsaDecrypt(encryptedSalary, privateKey);
+                }
+            } catch (decryptError) {
+                console.error(`Lỗi giải mã lương cho ${employee.MANV}:`, decryptError.message);
+            }
+            return { ...employee, LUONG: decryptedSalary };
+        }));
+
         res.render('admin/employees', {
-            employees: employees.recordset,
+            employees: employees,
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
+            error: null,
             success: 'Cập nhật nhân viên thành công',
         });
     } catch (error) {
         console.error('Lỗi khi cập nhật nhân viên:', error);
-        const pool = await getConnection();
-        const employees = await pool.request().execute('SP_SEL_ALL_NHANVIEN');
-        res.render('admin/employees', {
-            employees: employees.recordset,
-            staffName: req.session.user.HOTEN,
-            BASE_URL: res.locals.BASE_URL,
-            error: 'Lỗi khi cập nhật nhân viên: ' + error.message,
-        });
+        try {
+            const pool = await getConnection();
+            const listResult = await pool.request().execute('SP_SEL_ALL_NHANVIEN');
+            
+            // Decrypt salaries even in error case
+            const employees = await Promise.all(listResult.recordset.map(async (employee) => {
+                let decryptedSalary = 'N/A';
+                try {
+                    if (employee.LUONG && employee.PUBKEY) {
+                        const privateKeyPath = path.join(KEYS_DIR, employee.MANV + '_private.pem');
+                        const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+                        const encryptedSalary = Buffer.from(employee.LUONG).toString('base64');
+                        decryptedSalary = rsaDecrypt(encryptedSalary, privateKey);
+                    }
+                } catch (decryptError) {
+                    console.error(`Lỗi giải mã lương cho ${employee.MANV}:`, decryptError.message);
+                }
+                return { ...employee, LUONG: decryptedSalary };
+            }));
+
+            res.render('admin/employees', {
+                employees: employees,
+                staffName: req.session.user.HOTEN,
+                BASE_URL: res.locals.BASE_URL,
+                error: 'Lỗi khi cập nhật nhân viên: ' + error.message,
+                success: null
+            });
+        } catch (listError) {
+            console.error('Lỗi khi lấy danh sách nhân viên:', listError);
+            res.status(500).render('error', {
+                message: 'Đã xảy ra lỗi server',
+                error: { status: 500 },
+                BASE_URL: res.locals.BASE_URL
+            });
+        }
     }
 };
 

@@ -407,7 +407,7 @@ const assignClassesToEmployee = async (req, res) => {
                 request.input('MALOP', sql.VarChar, classId);
                 request.input('MANV', sql.VarChar, manv);
                 
-                await request.execute('SP_PhanLopChoNhanVien');
+                await request.execute('SP_AssignClassToEmployee');
                 results.push({ 
                     malop: classId, 
                     success: true,
