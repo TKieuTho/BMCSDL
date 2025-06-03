@@ -104,40 +104,44 @@
             </div>
         </header>
 
-        <% if (typeof error !== 'undefined' && error) { %>
-            <div class="error-message"><%= error %></div>
-        <% } %>
-
         <div class="grades-container">
-            <div class="search-container">
-                <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
-            </div>
-            <div class="subject-filter">
-                <label for="subject-select">Chọn môn học:</label>
-                <select id="subject-select">
-                    <% subjects.forEach(subject => { %>
-                        <% if (subject.MAHP) { %>
-                            <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
-                        <% } %>
-                    <% }); %>
-                </select>
-            </div>
-            <div class="grades-table">
-                <table>
-                    <thead id="grades-thead">
-                        <tr>
-                            <th>Mã SV</th>
-                            <th>Họ tên</th>
-                            <th>Điểm</th>
-                            <th>Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody id="grades-tbody">
-                        <!-- Sinh viên sẽ được render bằng JavaScript -->
-                    </tbody>
-                </table>
-                <div class="pagination" id="pagination"></div>
-            </div>
+            <% if (typeof error !== 'undefined' && error) { %>
+                <div class="error-message"><%= error %></div>
+            <% } else if (!isClassManager) { %>
+                <div class="error-message">
+                    Bạn không phải là nhân viên phụ trách lớp này. Vui lòng liên hệ với nhân viên phụ trách để xem điểm.
+                </div>
+            <% } else { %>
+                <div class="search-container">
+                    <input type="text" id="search" placeholder="Tìm theo mã SV hoặc họ tên...">
+                </div>
+                <div class="subject-filter">
+                    <label for="subject-select">Chọn môn học:</label>
+                    <select id="subject-select">
+                        <% subjects.forEach(subject => { %>
+                            <% if (subject.MAHP) { %>
+                                <option value="<%= subject.MAHP %>"><%= subject.TENHP %></option>
+                            <% } %>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="grades-table">
+                    <table>
+                        <thead id="grades-thead">
+                            <tr>
+                                <th>Mã SV</th>
+                                <th>Họ tên</th>
+                                <th>Điểm</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="grades-tbody">
+                            <!-- Sinh viên sẽ được render bằng JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="pagination" id="pagination"></div>
+                </div>
+            <% } %>
         </div>
     </div>
 
@@ -145,6 +149,7 @@
         const students = JSON.parse('<%- students %>');
         const subjects = JSON.parse('<%- JSON.stringify(subjects) %>');
         const grades = JSON.parse('<%- grades %>');
+        const isClassManager = <%- isClassManager %>;
         const itemsPerPage = 7;
         let currentPage = 1;
         let selectedSubject = subjects[0]?.MAHP || '';
@@ -162,6 +167,8 @@
         });
 
         function filterStudents() {
+            if (!isClassManager) return;
+            
             const searchValue = document.getElementById('search').value.trim().toLowerCase();
             
             filteredStudents = students.filter(student => 
@@ -176,6 +183,8 @@
         }
 
         function renderStudents(page) {
+            if (!isClassManager) return;
+            
             const tbody = document.getElementById('grades-tbody');
             tbody.innerHTML = '';
 
@@ -235,6 +244,8 @@
         }
 
         function renderPagination() {
+            if (!isClassManager) return;
+            
             const pagination = document.getElementById('pagination');
             pagination.innerHTML = '';
 
@@ -277,6 +288,8 @@
         }
 
         function attachEventListeners() {
+            if (!isClassManager) return;
+            
             document.querySelectorAll('.edit-grade-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const row = e.target.closest('tr');
@@ -370,6 +383,7 @@
         }
 
         document.getElementById('subject-select')?.addEventListener('change', (e) => {
+            if (!isClassManager) return;
             selectedSubject = e.target.value;
             currentPage = 1;
             filterStudents();
@@ -378,7 +392,7 @@
         console.log('Subjects data:', subjects);
         console.log('Students data:', students);
 
-        if (students.length > 0 && selectedSubject) {
+        if (students.length > 0 && selectedSubject && isClassManager) {
             document.getElementById('subject-select').value = selectedSubject;
             renderStudents(currentPage);
             renderPagination();

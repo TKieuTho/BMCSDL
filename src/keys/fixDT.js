@@ -46,7 +46,7 @@ async function fixAllGrades() {
 
         console.log(`Tìm thấy ${grades.recordset.length} bản ghi điểm`);
         for (const grade of grades.recordset) {
-            const { MASV, MAHP, MALOP } = grade;
+            const { MASV, MAHP, DIEMTHI, MALOP } = grade;
 
             // Lấy MANV từ LOP
             const lopRequest = pool.request();
@@ -82,8 +82,8 @@ async function fixAllGrades() {
                 continue;
             }
 
-            // Giả định điểm gốc (thay bằng điểm thực tế)
-            const originalGrade = '8.5'; // TODO: Lấy điểm thực tế từ hệ thống hoặc bảng khác
+            // Lấy điểm thực tế từ DIEMTHI
+            const originalGrade = parseFloat(Buffer.from(DIEMTHI).toString()).toFixed(1); // Chuyển từ buffer sang float
             console.log(`Đang mã hóa điểm ${originalGrade} cho ${MASV}, ${MAHP}`);
             const encryptedGrade = rsaEncrypt(originalGrade, publicKey);
 
@@ -108,6 +108,7 @@ async function fixAllGrades() {
         }
     }
 }
+
 
 fixAllGrades().catch(error => {
     console.error('Lỗi thực thi:', error.message, error.stack);

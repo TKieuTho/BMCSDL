@@ -97,6 +97,25 @@ const getClassGrades = async (req, res) => {
 
         const pool = await getConnection();
         
+        // Check if current user is the class manager
+        const classManagerRequest = pool.request();
+        classManagerRequest.input('MALOP', sql.VarChar, malop);
+        const classManagerResult = await classManagerRequest.query('SELECT MANV FROM LOP WHERE MALOP = @MALOP');
+        const isClassManager = classManagerResult.recordset[0]?.MANV === manv;
+
+        if (!isClassManager) {
+            return res.render('class-grades', {
+                error: 'Bạn không phải là nhân viên phụ trách lớp này. Vui lòng liên hệ với nhân viên phụ trách để xem điểm.',
+                staffName: req.session.user.HOTEN,
+                BASE_URL: res.locals.BASE_URL,
+                classId: malop,
+                subjects: [],
+                students: JSON.stringify([]),
+                grades: JSON.stringify([]),
+                isClassManager: false
+            });
+        }
+        
         // Lấy public key của nhân viên
         const keyRequest = pool.request();
         keyRequest.input('MANV', sql.VarChar, manv);
@@ -137,7 +156,8 @@ const getClassGrades = async (req, res) => {
             grades: JSON.stringify(decryptedGrades),
             classId: malop,
             staffName: req.session.user.HOTEN,
-            BASE_URL: res.locals.BASE_URL
+            BASE_URL: res.locals.BASE_URL,
+            isClassManager: true
         });
     } catch (error) {
         console.error('Lỗi trong getClassGrades:', error.message, error.stack);
@@ -148,7 +168,8 @@ const getClassGrades = async (req, res) => {
             classId: req.params.id,
             subjects: [],
             students: JSON.stringify([]),
-            grades: JSON.stringify([])
+            grades: JSON.stringify([]),
+            isClassManager: false
         });
     }
 };

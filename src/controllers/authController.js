@@ -79,27 +79,25 @@ const forgotPassword = async (req, res) => {
     const { email, manv } = req.body;
     
     try {
-        const result = await sql.query`
-            SELECT * FROM NHANVIEN 
-            WHERE EMAIL = ${email} AND MANV = ${manv}
-        `;
-
-        if (result.recordset.length === 0) {
-            return res.json({
-                success: false,
-                error: 'Mã nhân viên hoặc email không chính xác'
-            });
-        }
-
         // Generate new password
         const newPassword = generatePassword();
         
-        await sql.query`
-            UPDATE NHANVIEN 
-            SET MATKHAU = CAST(${newPassword} AS VARBINARY(MAX))
-            WHERE MANV = ${manv}
-        `;
+        // Hash password using SHA1
+        const hashedPassword = sha1Hash(newPassword);
 
+        // Get database connection
+        const pool = await getConnection();
+        const request = pool.request();
+        
+        // Set parameters for stored procedure
+        request.input('MANV', sql.VarChar, manv);
+        request.input('EMAIL', sql.VarChar, email);
+        request.input('NEW_MATKHAU', sql.VarBinary, hashedPassword);
+
+        // Execute stored procedure
+        await request.execute('SP_FORGOT_PASSWORD_NHANVIEN');
+
+        // Send email with new password
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
@@ -123,7 +121,7 @@ const forgotPassword = async (req, res) => {
         console.error('Forgot password error:', err);
         res.json({
             success: false,
-            error: 'Có lỗi xảy ra khi xử lý yêu cầu'
+            error: 'Có lỗi xảy ra khi xử lý yêu cầu: ' + err.message
         });
     }
 };

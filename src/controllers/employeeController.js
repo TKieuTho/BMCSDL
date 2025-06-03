@@ -106,6 +106,7 @@ const listEmployees = async (req, res) => {
                 staffName: req.session.user.HOTEN,
                 BASE_URL: res.locals.BASE_URL,
                 error: 'Yêu cầu quyền admin để xem danh sách nhân viên',
+                classes: []
             });
         }
 
@@ -114,6 +115,11 @@ const listEmployees = async (req, res) => {
         console.log('Đang thực thi SP_SEL_ALL_NHANVIEN...');
         const result = await request.execute('SP_SEL_ALL_NHANVIEN');
         console.log('Kết quả SP_SEL_ALL_NHANVIEN:', result.recordset.length, 'nhân viên');
+
+        // Lấy danh sách lớp
+        const classRequest = pool.request();
+        const classResult = await classRequest.execute('SP_SEL_ALL_CLASS');
+        console.log('Kết quả SP_SEL_ALL_CLASS:', classResult.recordset.length, 'lớp');
 
         const employees = await Promise.all(result.recordset.map(async (employee) => {
             let decryptedSalary = 'N/A';
@@ -154,6 +160,7 @@ const listEmployees = async (req, res) => {
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
             error: null,
+            classes: classResult.recordset || []
         });
     } catch (err) {
         console.error('Lỗi chi tiết:', {
@@ -166,6 +173,7 @@ const listEmployees = async (req, res) => {
             staffName: req.session.user.HOTEN,
             BASE_URL: res.locals.BASE_URL,
             error: 'Không thể lấy danh sách nhân viên',
+            classes: []
         });
     }
 };

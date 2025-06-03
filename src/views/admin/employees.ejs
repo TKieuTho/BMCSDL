@@ -461,6 +461,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
+                            <div id="classManagementNotification" class="alert" style="display: none;"></div>
                             <h4 id="employeeName"></h4>
                             <h5>Danh sách lớp đang quản lý</h5>
                             <table class="table table-bordered">
@@ -476,7 +477,7 @@
                                 </tbody>
                             </table>
                             <h5>Phân công lớp học</h5>
-                            <form id="assignClassesForm" action="<%= BASE_URL %>/class/classes/assign" method="POST">
+                            <form id="assignClassesForm">
                                 <input type="hidden" id="assign_manv" name="manv">
                                 <div class="form-group">
                                     <label>Chọn các lớp chưa được phân công:</label>
@@ -574,11 +575,6 @@
                     pageEmployees.forEach(employee => {
                         const row = document.createElement('tr');
                         row.dataset.manv = employee.MANV;
-                        row.style.cursor = 'pointer';
-                        row.onclick = function(event) {
-                            if (event.target.closest('.edit-btn') || event.target.closest('.delete-btn')) return;
-                            showClassManagementModal(employee.MANV, employee.HOTEN);
-                        };
                         row.innerHTML = `
                             <td>${employee.MANV || ''}</td>
                             <td>${employee.HOTEN || ''}</td>
@@ -586,11 +582,14 @@
                             <td>${employee.TENDN || ''}</td>
                             <td>${employee.LUONG ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(employee.LUONG) : 'N/A'}</td>
                             <td>
-                                <button class="edit-btn" onclick="event.stopPropagation(); showEditEmployee(this)">
+                                <button class="edit-btn" onclick="showEditEmployee(this)">
                                     <i class="fas fa-edit"></i> Sửa
                                 </button>
-                                <button class="delete-btn" onclick="event.stopPropagation(); confirmDeleteEmployee('${employee.MANV}')">
+                                <button class="delete-btn" onclick="confirmDeleteEmployee('${employee.MANV}')">
                                     <i class="fas fa-trash"></i> Xóa
+                                </button>
+                                <button class="btn btn-info btn-sm" onclick="showClassManagementModal('${employee.MANV}', '${employee.HOTEN}')">
+                                    <i class="fas fa-chalkboard"></i> Phân công
                                 </button>
                             </td>
                         `;
@@ -752,40 +751,78 @@
             document.getElementById('assignClassesForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const form = this;
-                const formData = new FormData(form);
-                const classes = formData.getAll('classes');
-                if (classes.length === 0) {
-                    showMessage('Vui lòng chọn ít nhất một lớp để phân công', 'error');
+                const manv = document.getElementById('assign_manv').value;
+                const selectedClasses = Array.from(document.querySelectorAll('input[name="classes"]:checked')).map(cb => cb.value);
+                const notificationDiv = document.getElementById('classManagementNotification');
+                
+                if (selectedClasses.length === 0) {
+                    notificationDiv.className = 'alert alert-danger';
+                    notificationDiv.textContent = 'Vui lòng chọn ít nhất một lớp để phân công';
+                    notificationDiv.style.display = 'block';
                     return;
                 }
 
                 try {
-                    const response = await fetch(form.action, {
+                    const response = await fetch(`${BASE_URL}/class/classes/assign`, {
                         method: 'POST',
-                        body: formData
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            manv: manv,
+                            classes: selectedClasses
+                        })
                     });
+
                     const data = await response.json();
                     if (data.success) {
-                        showMessage('Phân công lớp thành công', 'success');
-                        // Hide modal
-                        const modalElement = document.getElementById('classManagementModal');
-                        modalElement.style.display = 'none';
-                        modalElement.classList.remove('show');
-                        document.body.classList.remove('modal-open');
-                        // Remove backdrop
-                        const backdrop = document.querySelector('.modal-backdrop');
-                        if (backdrop) {
-                            backdrop.remove();
+                        notificationDiv.className = 'alert alert-success';
+                        notificationDiv.textContent = 'Phân công lớp thành công';
+                        notificationDiv.style.display = 'block';
+                        
+                        // Refresh the managed classes table
+                        const managedClassesTable = document.getElementById('managedClassesTable');
+                        managedClassesTable.innerHTML = '<tr><td colspan="3" class="text-center">Đang tải...</td></tr>';
+                        
+                        // Fetch updated managed classes
+                        const updatedResponse = await fetch(`${BASE_URL}/class/employee/${manv}`);
+                        const updatedData = await updatedResponse.json();
+                        
+                        if (updatedData.success && updatedData.classes && updatedData.classes.length > 0) {
+                            managedClassesTable.innerHTML = '';
+                            updatedData.classes.forEach(cls => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${cls.MALOP || ''}</td>
+                                    <td>${cls.TENLOP || ''}</td>
+                                    <td>${cls.MANV || ''}</td>
+                                `;
+                                managedClassesTable.appendChild(row);
+                            });
+                        } else {
+                            managedClassesTable.innerHTML = '<tr><td colspan="3" class="text-center">Không có lớp nào</td></tr>';
                         }
-                        // Refresh the page to show updated data
-                        window.location.reload();
+
+                        // Clear selected checkboxes
+                        document.querySelectorAll('input[name="classes"]:checked').forEach(cb => cb.checked = false);
                     } else {
-                        showMessage(data.error || 'Lỗi khi phân công lớp', 'error');
+                        notificationDiv.className = 'alert alert-danger';
+                        notificationDiv.textContent = data.error || 'Lỗi khi phân công lớp';
+                        notificationDiv.style.display = 'block';
                     }
                 } catch (error) {
                     console.error('Error assigning classes:', error);
-                    showMessage('Lỗi khi phân công lớp', 'error');
+                    notificationDiv.className = 'alert alert-danger';
+                    notificationDiv.textContent = 'Lỗi khi phân công lớp';
+                    notificationDiv.style.display = 'block';
                 }
+            });
+
+            // Reset notification when modal is closed
+            document.getElementById('classManagementModal').addEventListener('hidden.bs.modal', function () {
+                const notificationDiv = document.getElementById('classManagementNotification');
+                notificationDiv.style.display = 'none';
+                notificationDiv.textContent = '';
             });
 
             // Add event listener for modal close button

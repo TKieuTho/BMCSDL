@@ -1,9 +1,10 @@
 const sql = require('mssql');
 
-const { generateRSAKeyPairFromMK, rsaEncrypt } = require('../utils/crypto');
+const { sha1Hash, generateRSAKeyPairFromMK, rsaEncrypt } = require('../utils/crypto');
 const fs = require('fs').promises;
 const path = require('path');
-const KEYS_DIR = path.join(__dirname, 'keys');
+const KEYS_DIR = __dirname; // vì script đang nằm trong thư mục keys
+
 // Đảm bảo thư mục tồn tại
 fs.mkdir(KEYS_DIR, { recursive: true }).catch(console.error);
 const dbConfig = {
@@ -35,9 +36,14 @@ function generateRandomSalary() {
 }
 
 // Hàm xử lý từng nhân viên
+
+
 async function fixEmployeeKeysAndSalary(manv, matkhau, newSalary) {
     try {
-        // Tạo khóa từ mật khẩu
+        // 👉 Hash mật khẩu
+        const hashedMK = sha1Hash(matkhau);
+
+        // 👉 Tạo khóa từ mật khẩu gốc
         const { publicKey, privateKey } = await generateRSAKeyPairFromMK(matkhau);
         const pubkeyName = `${manv}_public.pem`;
         const privateKeyName = `${manv}_private.pem`;
@@ -56,17 +62,21 @@ async function fixEmployeeKeysAndSalary(manv, matkhau, newSalary) {
         request.input('MANV', sql.VarChar, manv);
         request.input('LUONG', sql.VarBinary, Buffer.from(encryptedSalary, 'base64'));
         request.input('PUBKEY', sql.NVarChar, pubkeyName);
+        request.input('MATKHAU', sql.VarBinary, hashedMK);
         await request.query(`
             UPDATE NHANVIEN
-            SET LUONG = @LUONG, PUBKEY = @PUBKEY
+            SET LUONG = @LUONG, 
+                PUBKEY = @PUBKEY,
+                MATKHAU = @MATKHAU
             WHERE MANV = @MANV
         `);
 
-        console.log(`✅ Đã cập nhật LUONG và PUB cho ${manv}`);
+        console.log(`✅ Đã cập nhật LUONG, PUB và MK cho ${manv}`);
     } catch (error) {
         console.error(`❌ Lỗi sửa ${manv}:`, error.message);
     }
 }
+
 
 // Hàm xử lý toàn bộ nhân viên
 async function fixAllEmployees() {
@@ -89,7 +99,8 @@ async function fixAllEmployees() {
                 continue;
             }
 
-            const matkhau = '123456'; // Hoặc employee.TENDN nếu có
+            // Sử dụng '123456' làm mật khẩu mặc định cho tất cả nhân viên
+            const matkhau = '123456';
             const newSalary = generateRandomSalary();
             await fixEmployeeKeysAndSalary(manv, matkhau, newSalary);
         }
